@@ -49,3 +49,7 @@ https://www.youtube.com/watch?v=_ccpjpWeJXw
 A second video is about motif finding, it uses PBM and finds PWM (Part 2).
 https://www.youtube.com/watch?v=jL-SKPi9fbY
 
+Brand new paper I saw, Any ReLU network can be represent using a 3-layer network.
+Didn't read yet but could mean we can avoid some deep and hard to run models, with much better performance, equaled networks.
+https://www.arxiv.org/abs/2306.11827
+
