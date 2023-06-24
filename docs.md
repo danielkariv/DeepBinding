@@ -1,5 +1,5 @@
 # Docs
-contains links and data I collected, to have some bases to work on the project. Will be expend when I find more stuff.
+Contains links and data I collected, to have some bases to work on the project. Will be expend when I find more stuff.
 
 # The datasets are:
 All files extract to main directory, like this: 'RBNS_testing/...', 'RBNS_training/...', 'RNCMPT_training', 'RNAcompete_sequences.txt'.
@@ -27,6 +27,10 @@ goal/output = predict RNA binding intensity for each RNAcompete probe (run on th
 basically, we use the RBPX_input,5nm,20nm...1300nm to train a model. This model is later used to estimate binding values and validated using the given the RNAcompete probes list and RNAcompete_sequences (only for validation).
 We probably do have to train a second model that uses the first model to estimate the values more closely to the real ones, and then we can estimate the unknown values (what we sumbit later) with a trained model using the specific known RBNS.
 basically, Model 1 is features extracting, learn on specific RBP, but Model 2 that use Model 1, is also learn but on all the known RBPs binding scores so we have a scoring model for unknown RBPs biding scores.
+
+# Some stuff about keras:
+I using something called TensorBoard, which runs a server under http://localhost:6006
+It gives graphs of different values while training models.
 
 # Info,Data,Video,Etc:
 A paper about this project, by Eitamar Tripto, supervised by Dr. Yaron Orenstein.
