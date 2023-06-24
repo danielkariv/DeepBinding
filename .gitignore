@@ -1,6 +1,9 @@
-
+# Mac files.
 .DS_Store
+# Datasets (too big to add anyways)
 RBNS_training
 RBNS_testing
 RNCMPT_training
 RNAcompete_sequences.txt
+# Building files.
+*.pyc
