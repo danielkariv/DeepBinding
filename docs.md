@@ -35,6 +35,11 @@ It gives graphs of different values while training models.
 # Info,Data,Video,Etc:
 A paper about this project, by Eitamar Tripto, supervised by Dr. Yaron Orenstein.
 https://in.bgu.ac.il/en/robotics/thesis/TriptoEitamar19912.pdf
+
+DeepSelex more info:
+https://academic.oup.com/bioinformatics/article/36/Supplement_2/i634/6055905
+https://github.com/OrensteinLab/DeepSELEX
+
 A paper that gave me the idea of how to model our system, though I implemented something much simlper than them but we can use it to see where to progress next.
 https://arxiv.org/pdf/1906.03087.pdf
 Something about scores on very similar dataset if not the same based on it's size (31 RBPs with RNAcompete)
@@ -53,3 +58,13 @@ Brand new paper I saw, Any ReLU network can be represent using a 3-layer network
 Didn't read yet but could mean we can avoid some deep and hard to run models, with much better performance, equaled networks.
 https://www.arxiv.org/abs/2306.11827
 
+
+
+# Solution:
+Sliding window for k-mers (k=6?) -> model (finds motifs) -> output is the score (label). Sum them up and have the final score.
+Yaron said that we can start by taking input.seq as negative score, and 1300nM.seq as positive.
+Later with RBP1.txt, we can compare to the scores we receives (using RNAcompete_sequences.txt).
+
+Sliding window can be maybe be done with Generators (too big data, needs to happen on fly, per batch).
+model, questionable how to design, it suppose to detect the motifs using the BnS and then we will use it to score the RNAcompete_sequences.txt. Basically making a model for each RBP.
+the scoring itself, doesn't seems to be learnt, and should be somewhat simple. using maybe sliding windows on the RNAcompete, we could score it like that?
