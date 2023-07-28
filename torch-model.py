@@ -8,7 +8,7 @@ import time
 import csv
 import random
 # Set the seed for PyTorch
-torch.manual_seed(42)
+# torch.manual_seed(42)
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,11 +55,10 @@ def createModel():
     summary(model, (42, 4))
     return model
 
-def trainModel(model, seqs_per_file, batch_size, epochs, learning_rate):
+def trainModel(model, rbns_file_paths, seqs_per_file, batch_size, epochs, learning_rate):
     print('Load Data!')
     # NOTE: It loads to memory the seqs. it takes around 20gb on RAM, so run it on a system that can process it.
     #       We could process it by loading when needed a row from it but it is really slow.
-    rbns_file_paths = ['RBNS_training/RBP1_input.seq','RBNS_training/RBP1_5nM.seq','RBNS_training/RBP1_20nM.seq','RBNS_training/RBP1_80nM.seq','RBNS_training/RBP1_320nM.seq','RBNS_training/RBP1_1300nM.seq']
     rbns_dataset = RBNSDataset(rbns_file_paths,seqs_per_file) 
     data_loader = DataLoader(rbns_dataset, batch_size=batch_size, shuffle=True)
 
@@ -103,14 +102,11 @@ def trainModel(model, seqs_per_file, batch_size, epochs, learning_rate):
         if (epoch + 1) % print_every_epochs == 0:
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
 
-def evaluateModel(model):
+def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, batch_size=256):
     print('Start evaluate!')
-    # Evaluate
-    RNAcompete_sequences_path = "RNAcompete_sequences.txt"
-    RNCMPT_training_path = "RNCMPT_training/RBP1.txt"
     # Create the custom dataset
     eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, RNCMPT_training_path)
-    eval_loader = DataLoader(eval_dataset, batch_size=256, shuffle=False)
+    eval_loader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=False)
 
     # Set the model to evaluation mode
     model.eval()
@@ -153,14 +149,16 @@ def evaluateModel(model):
             writer.writerow(row)
 
     # Convert the lists to tensors
-    predicts_tensor = torch.tensor(predicts)
-    truths_tensor = torch.tensor(truths)
+    epsilon = 1e-9  # A small value to avoid division by zero
+    predicts_tensor = torch.tensor(predicts) + epsilon
+    truths_tensor = torch.tensor(truths) + epsilon
 
     combined_tensor = torch.stack((predicts_tensor, truths_tensor), dim=0)
 
     # Calculate Pearson correlation
     correlation_matrix = torch.corrcoef(combined_tensor)
     pearson_correlation = correlation_matrix[0, 1]
+    # TODO: not sure if this is how we suppose to compare to the real outputs.
     print('Pearson correlation:', pearson_correlation.item())
     return pearson_correlation.item()
 
@@ -178,10 +176,13 @@ def generateHyperparams():
     learning_rate = random.uniform(*learning_rate_range)
 
     return seqs_per_file, batch_size, epochs, learning_rate
-if __name__ == '__main__':
 
+def serachParams():
+    rbns_file_paths = ['RBNS_training/RBP1_input.seq','RBNS_training/RBP1_5nM.seq','RBNS_training/RBP1_20nM.seq','RBNS_training/RBP1_80nM.seq','RBNS_training/RBP1_320nM.seq','RBNS_training/RBP1_1300nM.seq']
+    RNAcompete_sequences_path = "RNAcompete_sequences.txt"
+    RNCMPT_training_path = "RNCMPT_training/RBP1.txt"
     csv_filename = "results.csv"
-    
+
     # Open the CSV file in write mode and create a CSV writer object
     with open(csv_filename, mode='w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -195,8 +196,8 @@ if __name__ == '__main__':
             seqs_per_file, batch_size, epochs, learning_rate = generateHyperparams()
             print('Testing Hyperparams:\n', 'Seqs per file:', seqs_per_file, ', Batch size:', batch_size, ', Epochs:', epochs, ', Learning Rate:', learning_rate)
             model = createModel()
-            trainModel(model, seqs_per_file, batch_size, epochs, learning_rate)
-            pearson_correlation = evaluateModel(model)
+            trainModel(model, rbns_file_paths, seqs_per_file, batch_size, epochs, learning_rate)
+            pearson_correlation = evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path)
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Elapsed Time: {elapsed_time} seconds")
@@ -204,4 +205,24 @@ if __name__ == '__main__':
             # Write the results to the CSV file
             writer.writerow([torch.get_rng_state(),seqs_per_file, batch_size, epochs, learning_rate, pearson_correlation, elapsed_time])
 
-        
+def processOnce():
+    rbns_file_paths = ['RBNS_training/RBP1_input.seq','RBNS_training/RBP1_5nM.seq','RBNS_training/RBP1_20nM.seq','RBNS_training/RBP1_80nM.seq','RBNS_training/RBP1_320nM.seq','RBNS_training/RBP1_1300nM.seq']
+    RNAcompete_sequences_path = "RNAcompete_sequences.txt"
+    RNCMPT_training_path = "RNCMPT_training/RBP1.txt"
+
+    start_time = time.time()
+    # NOTE: best on the model after few hours of searching, ~0.1 corr, while taking ~210 seconds.
+    #       But, I tested on RBP2 which got ~0 corr so.. the model maybe doesn't work yet.
+    seqs_per_file, batch_size, epochs, learning_rate = 50000, 32, 3, 0.001
+    print('Testing Hyperparams:\n', 'Seqs per file:', seqs_per_file, ', Batch size:', batch_size, ', Epochs:', epochs, ', Learning Rate:', learning_rate)
+    model = createModel()
+    trainModel(model, rbns_file_paths, seqs_per_file, batch_size, epochs, learning_rate)
+    pearson_correlation = evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed Time: {elapsed_time} seconds")
+
+
+if __name__ == '__main__':
+    # serachParams()
+    processOnce()
