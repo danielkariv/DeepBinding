@@ -7,3 +7,5 @@ RNCMPT_training
 RNAcompete_sequences.txt
 # Building files.
 *.pyc
+results.csv
+output_file.csv
