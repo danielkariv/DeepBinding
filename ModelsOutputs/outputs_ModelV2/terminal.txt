@@ -1,0 +1,172 @@
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP1_input.seq
+Loaded seqs file:  RBNS_training/RBP1_5nM.seq
+Loaded seqs file:  RBNS_training/RBP1_20nM.seq
+Loaded seqs file:  RBNS_training/RBP1_80nM.seq
+Loaded seqs file:  RBNS_training/RBP1_320nM.seq
+Loaded seqs file:  RBNS_training/RBP1_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0968
+Epoch [2/3], Loss: 0.0654
+Epoch [3/3], Loss: 0.0828
+Start evaluate!
+Pearson correlation: 0.15899890661239624
+Elapsed Time: 213.22433495521545 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP2_input.seq
+Loaded seqs file:  RBNS_training/RBP2_5nM.seq
+Loaded seqs file:  RBNS_training/RBP2_20nM.seq
+Loaded seqs file:  RBNS_training/RBP2_80nM.seq
+Loaded seqs file:  RBNS_training/RBP2_320nM.seq
+Loaded seqs file:  RBNS_training/RBP2_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0852
+Epoch [2/3], Loss: 0.0755
+Epoch [3/3], Loss: 0.0886
+Start evaluate!
+Pearson correlation: 0.18451173603534698
+Elapsed Time: 229.9561631679535 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP3_input.seq
+Loaded seqs file:  RBNS_training/RBP3_5nM.seq
+Loaded seqs file:  RBNS_training/RBP3_20nM.seq
+Loaded seqs file:  RBNS_training/RBP3_80nM.seq
+Loaded seqs file:  RBNS_training/RBP3_320nM.seq
+Loaded seqs file:  RBNS_training/RBP3_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0936
+Epoch [2/3], Loss: 0.0616
+Epoch [3/3], Loss: 0.0835
+Start evaluate!
+Pearson correlation: 0.043011657893657684
+Elapsed Time: 211.38061785697937 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP4_input.seq
+Loaded seqs file:  RBNS_training/RBP4_5nM.seq
+Loaded seqs file:  RBNS_training/RBP4_20nM.seq
+Loaded seqs file:  RBNS_training/RBP4_80nM.seq
+Loaded seqs file:  RBNS_training/RBP4_320nM.seq
+Loaded seqs file:  RBNS_training/RBP4_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0849
+Epoch [2/3], Loss: 0.0694
+Epoch [3/3], Loss: 0.0603
+Start evaluate!
+Pearson correlation: 0.08571964502334595
+Elapsed Time: 215.17347645759583 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP5_input.seq
+Loaded seqs file:  RBNS_training/RBP5_5nM.seq
+Loaded seqs file:  RBNS_training/RBP5_20nM.seq
+Loaded seqs file:  RBNS_training/RBP5_80nM.seq
+Loaded seqs file:  RBNS_training/RBP5_320nM.seq
+Loaded seqs file:  RBNS_training/RBP5_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0754
+Epoch [2/3], Loss: 0.0888
+Epoch [3/3], Loss: 0.0782
+Start evaluate!
+Pearson correlation: 0.04022911936044693
+Elapsed Time: 214.13026928901672 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP6_input.seq
+Loaded seqs file:  RBNS_training/RBP6_5nM.seq
+Loaded seqs file:  RBNS_training/RBP6_20nM.seq
+Loaded seqs file:  RBNS_training/RBP6_80nM.seq
+Loaded seqs file:  RBNS_training/RBP6_320nM.seq
+Loaded seqs file:  RBNS_training/RBP6_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0870
+Epoch [2/3], Loss: 0.0775
+Epoch [3/3], Loss: 0.0932
+Start evaluate!
+Pearson correlation: 0.07990586757659912
+Elapsed Time: 217.01906752586365 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP7_input.seq
+Loaded seqs file:  RBNS_training/RBP7_5nM.seq
+Loaded seqs file:  RBNS_training/RBP7_20nM.seq
+Loaded seqs file:  RBNS_training/RBP7_80nM.seq
+Loaded seqs file:  RBNS_training/RBP7_320nM.seq
+Loaded seqs file:  RBNS_training/RBP7_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0777
+Epoch [2/3], Loss: 0.0646
+Epoch [3/3], Loss: 0.0684
+Start evaluate!
+Pearson correlation: -0.02702534943819046
+Elapsed Time: 219.86713075637817 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP8_input.seq
+Loaded seqs file:  RBNS_training/RBP8_5nM.seq
+Loaded seqs file:  RBNS_training/RBP8_20nM.seq
+Loaded seqs file:  RBNS_training/RBP8_80nM.seq
+Loaded seqs file:  RBNS_training/RBP8_320nM.seq
+Loaded seqs file:  RBNS_training/RBP8_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0557
+Epoch [2/3], Loss: 0.0802
+Epoch [3/3], Loss: 0.0948
+Start evaluate!
+Pearson correlation: 8.489177707815543e-05
+Elapsed Time: 220.90434908866882 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP9_input.seq
+Loaded seqs file:  RBNS_training/RBP9_5nM.seq
+Loaded seqs file:  RBNS_training/RBP9_20nM.seq
+Loaded seqs file:  RBNS_training/RBP9_80nM.seq
+Loaded seqs file:  RBNS_training/RBP9_320nM.seq
+Loaded seqs file:  RBNS_training/RBP9_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0987
+Epoch [2/3], Loss: 0.0631
+Epoch [3/3], Loss: 0.0932
+Start evaluate!
+Pearson correlation: 0.016031283885240555
+Elapsed Time: 240.97058367729187 seconds
+Run with Hyperparams:
+ Seqs per file: 50000 , Batch size: 32 , Epochs: 3 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP10_input.seq
+Loaded seqs file:  RBNS_training/RBP10_5nM.seq
+Loaded seqs file:  RBNS_training/RBP10_20nM.seq
+Loaded seqs file:  RBNS_training/RBP10_80nM.seq
+Loaded seqs file:  RBNS_training/RBP10_320nM.seq
+Loaded seqs file:  RBNS_training/RBP10_1300nM.seq
+Start Training!
+Epoch [1/3], Loss: 0.0741
+Epoch [2/3], Loss: 0.1042
+Epoch [3/3], Loss: 0.0944
+Start evaluate!
+Pearson correlation: 0.004072384908795357
+Elapsed Time: 219.90352034568787 seconds
+-----------------------------------------
+Sum of Pearson correlations: 
+RBP1  0.15899890661239624
+RBP2  0.18451173603534698
+RBP3  0.043011657893657684
+RBP4  0.08571964502334595
+RBP5  0.04022911936044693
+RBP6  0.07990586757659912
+RBP7  -0.02702534943819046
+RBP8  8.489177707815543e-05
+RBP9  0.016031283885240555
+RBP10 0.004072384908795357
