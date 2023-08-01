@@ -37,13 +37,13 @@ class RBNSDataset(Dataset):
         self.nrows_per_file = nrows_per_file
 
         self.file_seqs, self.file_targets, self.cumulative_lengths = self._load_data()
-        
+        print(self.file_seqs, len(self.file_seqs))
     def __len__(self):
         return len(self.file_seqs)
     
     def _load_data(self):
         # Load and concatenate data from multiple files
-        nucleoties = [index for index in range(len(self.file_paths))]
+        nucleotides = [index for index in range(len(self.file_paths))]
         data_list = []
         target_list = []
         cumulative_lengths = [0]  # Store the cumulative lengths of the files
@@ -52,21 +52,33 @@ class RBNSDataset(Dataset):
             # Get path to file.
             file_path = self.file_paths[index]
             # Load it, and getting a sample of it if we limited the amount.
-            file_data = pd.read_csv(file_path, delimiter='\t', header=None, usecols=[0])
-            if self.nrows_per_file >= 0:
-                file_data = file_data.sample(n=self.nrows_per_file, random_state=self.SEED)
+            file_data = pd.read_csv(file_path, delimiter='\t', header=None, usecols=[0,1])
+            file_data.columns = ['RNA', 'Counts']
+            file_data = file_data.sort_values(by='Counts', ascending=False)
 
-            data_list.append(file_data)
-            # Create truth/target/outputs for the samples, based on the file index.
-            target = [index]
-            target_onehot = one_hot_encoding(target,nucleoties, 1, 0)[0]
-            target_list.extend([target_onehot] * len(file_data))
+            if self.nrows_per_file >= 0:
+                # Select the most frequent sequences up to nrows_per_file
+                file_data = file_data.head(self.nrows_per_file)
+            total_added = 0
+            # Iterate through each row and add RNA sequences based on their counts
+            for _, row in file_data.iterrows():
+                sequence = row['RNA']
+                count = row['Counts']
+                # Add the sequence 'count' number of times to the data_list
+                data_list.extend([sequence] * count)
+                total_added += count
+                # Create truth/target/outputs for the samples, based on the file index.
+                target = [index]
+                target_onehot = one_hot_encoding(target, nucleotides, 1, 0)[0]
+                # Add the one-hot encoded target 'count' number of times to the target_list
+                target_list.extend([target_onehot] * count)
+            
             # Save lengths for use in _get_file_index (TODO: maybe I don't it, because of targets, or we could use it to make the memory usage lower)
-            cumulative_lengths.append(cumulative_lengths[-1] + len(file_data))
+            cumulative_lengths.append(cumulative_lengths[-1] + total_added)
 
             print('Loaded seqs file: ', file_path)
         
-        return pd.concat(data_list, ignore_index=True), target_list, cumulative_lengths
+        return data_list, target_list, cumulative_lengths
 
     # TODO: maybe remove it.
     def _get_file_index(self,index):
@@ -83,11 +95,11 @@ class RBNSDataset(Dataset):
 
     def __getitem__(self, index):
         # Access the RNA sequence at the specified index
-        rna_sequence = self.file_seqs.iloc[index, 0]
+        rna_sequence = self.file_seqs[index]
         binding_score = self.file_targets[index]
         
         # preprocess the RNA Sequence by creating an one hot encoding, with padding and max length (RBNS has sequences with the same size, but in RNCMPT they are different in size and so is needed)
-        preprocessed_rna_sequence = one_hot_encoding(rna_sequence,['A','C','G','T'],max_length=20,padding_value=0.25)
+        preprocessed_rna_sequence = one_hot_encoding(rna_sequence,['A','C','G','T', 'N'],max_length=20,padding_value=0.25)
 
         # Convert the input/ouput to tensors for usage in pytorch.
         input_data = torch.tensor(preprocessed_rna_sequence, dtype=torch.float32)
@@ -115,7 +127,7 @@ class RNCMPTDataset(Dataset):
         binding_score = torch.tensor(self.targets_data[index], dtype=torch.float32)
         
         # Preprocess the RNA Sequence by creating an one hot encoding, with padding and max length
-        preprocessed_rna_sequence = one_hot_encoding(rna_sequence, ['A', 'C', 'G', 'U'], max_length=self.expectedSeqLength, padding_value=0.25)
+        preprocessed_rna_sequence = one_hot_encoding(rna_sequence, ['A', 'C', 'G', 'U', 'N'], max_length=self.expectedSeqLength, padding_value=0.25)
         
         # Convert the input/ouput to tensors for usage in pytorch.
         input_data = torch.tensor(preprocessed_rna_sequence, dtype=torch.float32)

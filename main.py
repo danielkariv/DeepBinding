@@ -21,8 +21,8 @@ torch.manual_seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def createModel(inputShape, classesNum):
-    model = DeepConvModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
-    summary(model, inputShape)
+    model = DeepSELEX2(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
+    # summary(model, inputShape)
     return model
 
 def loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio):
@@ -63,7 +63,8 @@ def trainModel(rbns_file_paths):
     model = createModel(inputShape, classesNum)
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr = learning_rate, weight_decay = weight_decay, betas = betas)
+    #optimizer = optim.Adam(model.parameters(), lr = learning_rate, weight_decay = weight_decay, betas = betas)
+    optimizer = optim.Adam(model.parameters(), lr = learning_rate)
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: min(1.0, epoch / warmup_epochs))
 
     best_loss = float('inf')
@@ -242,7 +243,7 @@ def find_rbp_files(dir_path, rbp_num):
 # helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
 def RunOverAll():
     num_rbns_files = 16
-    dir_path = 'E:/RNA_DATASET'
+    dir_path = '.'
     with open('pearson.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         # write row.
