@@ -155,7 +155,7 @@ class ModelV4(nn.Module):
 
         # Fully connected layers
         self.fc_layers = nn.Sequential(
-            nn.Linear(kernelsPerConv * 8, 128),  # input size = 1536 is the number of output channels from each Conv1d layer
+            nn.Linear(kernelsPerConv * 3 * 8, 128),  # input size = 1536 is the number of output channels from each Conv1d layer
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(128, 64),
@@ -282,6 +282,63 @@ class ModelV6(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # transpose the matrix
+        x = x.permute(0, 2, 1)
+
+        # Apply Conv1d layers with different kernel sizes
+        conv_outputs = []
+        for conv_layer, pool_layer in zip(self.conv_layers, self.pool_layers):
+            out = pool_layer(self.relu(conv_layer(x)))
+            conv_outputs.append(out)
+
+        # Concatenate the outputs from the Conv1d layers
+        x = torch.cat(conv_outputs, dim=1)
+
+        # Reshape x for fully connected layers
+        x = x.view(x.size(0), -1)
+
+        # Apply fully connected layers
+        x = self.fc_layers(x)
+        return x
+
+# NOTE: It is model V6 with some changes:
+#       - Kernel sizes changed to 5,7,9,11 (based on reserachs and codebases it seems like a good k-mers to test on)
+#       - less Kernels Per Conv (like ModelV4)
+#       - Changed the hidden layers to be based on the Kernels per Conv number. 
+#       Time: 220 seconds. 
+#      Performance: Similar to V4. I think it worth to try looking for other hyperparams.
+#      (seqs_per_file, batch_size, epochs, learning_rate = 16000, 128, 5, 0.001)
+class ModelV7(nn.Module):
+    def __init__(self):
+        super(ModelV7, self).__init__()
+        kernelsPerConv = 64
+        kernelsSizes =  [5, 7, 9, 11]
+        # Conv1d layers with kernel sizes ranging from 3 to 12
+        self.conv_layers = nn.ModuleList([
+            nn.Conv1d(in_channels=4, out_channels=kernelsPerConv, kernel_size=k, stride=1, padding=k // 2) for k in kernelsSizes
+        ])
+
+        # ReLU activation
+        self.relu = nn.ReLU()
+
+        # MaxPool1d layers
+        self.pool_layers = nn.ModuleList([
+            nn.MaxPool1d(kernel_size=5, stride=5) for _ in range(len(kernelsSizes))
+        ])
+
+        # Fully connected layers
+        self.fc_layers = nn.Sequential(
+            nn.Linear(kernelsPerConv * len(kernelsSizes) * 8, kernelsPerConv*4),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(kernelsPerConv*4, kernelsPerConv),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(kernelsPerConv, 1),
             nn.Sigmoid()
         )
 

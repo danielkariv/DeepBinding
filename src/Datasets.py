@@ -37,8 +37,8 @@ class RBNSDataset(Dataset):
     def __init__(self, file_paths, nrows_per_file = -1):
         self.nrows_per_file = nrows_per_file
         self.file_paths = file_paths
-        self.file_seqs, self.cumulative_lengths = self._load_data()
-
+        self.file_seqs, self.file_targets, self.cumulative_lengths = self._load_data()
+    
     def __len__(self):
         return len(self.file_seqs)
     
@@ -49,15 +49,15 @@ class RBNSDataset(Dataset):
         cumulative_lengths = [0]  # Store the cumulative lengths of the files
         for index in range(len(self.file_paths)):
             file_path = self.file_paths[index]
-            if self.nrows_per_file >= 0:
-                file_data = pd.read_csv(file_path, delimiter='\t', header=None, nrows=self.nrows_per_file)
-            else:
-                file_data = pd.read_csv(file_path, delimiter='\t', header=None)
+            if self.nrows_per_file < 0:
+                self.nrows_per_file = None
+            file_data = pd.read_csv(file_path, delimiter='\t', header=None, nrows=self.nrows_per_file)
+            
             data_list.append(file_data)
-            target_list.extend([np.array([index/len(self.file_paths)]) for _ in range(len(file_data))])
+            # target_list.extend( for _ in range(len(file_data))])
             cumulative_lengths.append(cumulative_lengths[-1] + len(file_data))
             print('Loaded seqs file: ', file_path)
-        return pd.concat(data_list, ignore_index=True), cumulative_lengths
+        return pd.concat(data_list, ignore_index=True), target_list, cumulative_lengths
 
     def _get_file_index(self,index):
         file_index = sum(1 for length in self.cumulative_lengths if length <= index)
@@ -66,8 +66,7 @@ class RBNSDataset(Dataset):
     def __getitem__(self, index):
         # Access the RNA sequence at the specified index
         rna_sequence = self.file_seqs.iloc[index, 0]
-        binding_score = np.array([self._get_file_index(index)/len(self.file_paths)])
-
+        binding_score = np.array([self._get_file_index(index)/len(self.file_paths)]) # self.file_targets[index]
         # Preprocess the RNA sequence (if needed)
         preprocessed_rna_sequence = preprocess_rna(rna_sequence)
 

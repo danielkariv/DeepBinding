@@ -1,3 +1,4 @@
+import os
 import time
 import csv
 import random
@@ -20,7 +21,7 @@ TRAINING_PRINT_EVERY_BATCHES = -1
 EVALUATION_PRINT_EVERY_BATCHES = -1
 
 def createModel():
-    model = ModelV6().to(device) # NOTE: Set the model we want to run here.
+    model = ModelV4().to(device) # NOTE: Set the model we want to run here.
     # summary(model, (42, 4))
     return model
 
@@ -126,7 +127,8 @@ def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, batch_
 def processOnce(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path, RBP_num):
     start_time = time.time()
     
-    seqs_per_file, batch_size, epochs, learning_rate = 50000, 32, 3, 0.001
+    # seqs_per_file, batch_size, epochs, learning_rate = 50000, 32, 3, 0.001
+    seqs_per_file, batch_size, epochs, learning_rate = 16000, 32, 15, 0.002
     print('Run with Hyperparams:\n', 'Seqs per file:', seqs_per_file, ', Batch size:', batch_size, ', Epochs:', epochs, ', Learning Rate:', learning_rate)
     model = createModel()
     trainModel(model, rbns_file_paths, seqs_per_file, batch_size, epochs, learning_rate)
@@ -142,9 +144,9 @@ def processOnce(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path
 def generateHyperparams():
     # Define the lists for each hyperparameter
     seqs_per_file_list = [16000, 32000, 64000, 128000]
-    batch_size_list = [16, 32, 64, 128, 256]
-    epochs_list = [3, 5, 7, 10, 15]
-    learning_rate_list = [0.0001, 0.001, 0.01]
+    batch_size_list = [16, 32, 64, 128, 256, 512]
+    epochs_list = [3, 5, 7, 10]
+    learning_rate_list = [0.00001 ,0.0001, 0.001, 0.01]
 
     # Generate random hyperparameters by randomly selecting from the lists
     seqs_per_file = random.choice(seqs_per_file_list)
@@ -154,48 +156,38 @@ def generateHyperparams():
 
     return seqs_per_file, batch_size, epochs, learning_rate
 
-# def generateHyperparams():
-#     # Define the range for each hyperparameter
-#     seqs_per_file_range = (16000, 64000)
-#     batch_size_range = (16, 64)
-#     epochs_range = (3, 10)
-#     learning_rate_range = (0.0001, 0.01)
-
-#     # Generate random hyperparameters within the specified ranges
-#     seqs_per_file = random.randint(*seqs_per_file_range)
-#     batch_size = random.randint(*batch_size_range)
-#     epochs = random.randint(*epochs_range)
-#     learning_rate = random.uniform(*learning_rate_range)
-
-#     return seqs_per_file, batch_size, epochs, learning_rate
-
 def serachParams(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path, csv_filename = "results.csv"):
     # Open the CSV file in write mode and create a CSV writer object
     with open(csv_filename, mode='w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-
         # Write the header row to the CSV file
-        writer.writerow(["Seed","Seqs per file", "Batch size", "Epochs", "Learning Rate", "Pearson Correlation", "Elapsed Time"])
-
+        writer.writerow(["Seqs per file", "Batch size", "Epochs", "Learning Rate", "Pearson Correlation", "Elapsed Time"])
         # Loop for 20 iterations and write results for each iteration
         for i in range(20):
             start_time = time.time()
             seqs_per_file, batch_size, epochs, learning_rate = generateHyperparams()
-            print('Testing Hyperparams:\n', 'Seqs per file:', seqs_per_file, ', Batch size:', batch_size, ', Epochs:', epochs, ', Learning Rate:', learning_rate)
+            print('Testing Hyperparams:\n', 'Seqs per file:', seqs_per_file, ', Batch size:', batch_size, ', Epochs:', epochs, ', Learning Rate:', learning_rate)            
             model = createModel()
             trainModel(model, rbns_file_paths, seqs_per_file, batch_size, epochs, learning_rate)
-            pearson_correlation = evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, output_path=f'outputs/searchEvaluation_seqs{seqs_per_file}_batchSize{batch_size}_epochs{epochs}_lr{learning_rate}.csv')
+            pearson_correlation = evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, output_path=f'outputs/search_seed{torch.seed()}_seqs{seqs_per_file}_batchSize{batch_size}_epochs{epochs}_lr{learning_rate}.csv')
             end_time = time.time()
             elapsed_time = end_time - start_time
             print(f"Elapsed Time: {elapsed_time} seconds")
 
             # Write the results to the CSV file
-            writer.writerow([torch.get_rng_state(),seqs_per_file, batch_size, epochs, learning_rate, pearson_correlation, elapsed_time])
+            writer.writerow([seqs_per_file, batch_size, epochs, learning_rate, pearson_correlation, elapsed_time])
 
 
 if __name__ == '__main__':
-    rbns_file_paths = ['RBNS_training/RBP1_input.seq','RBNS_training/RBP1_5nM.seq','RBNS_training/RBP1_20nM.seq','RBNS_training/RBP1_80nM.seq','RBNS_training/RBP1_320nM.seq','RBNS_training/RBP1_1300nM.seq']
+    rbns_file_paths = [
+                       'RBNS_training/RBP1_input.seq',
+                       'RBNS_training/RBP1_5nM.seq',
+                       'RBNS_training/RBP1_20nM.seq',
+                       'RBNS_training/RBP1_80nM.seq',
+                       'RBNS_training/RBP1_320nM.seq',
+                       'RBNS_training/RBP1_1300nM.seq'
+                       ]
     RNAcompete_sequences_path = "RNAcompete_sequences.txt"
     RNCMPT_training_path = "RNCMPT_training/RBP1.txt"
-    serachParams(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path)
-    # processOnce(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path, 1)
+    # serachParams(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path)
+    processOnce(rbns_file_paths, RNAcompete_sequences_path, RNCMPT_training_path, 1)

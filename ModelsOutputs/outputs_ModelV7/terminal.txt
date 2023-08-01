@@ -1,0 +1,180 @@
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP1_input.seq
+Loaded seqs file:  RBNS_training/RBP1_5nM.seq
+Loaded seqs file:  RBNS_training/RBP1_20nM.seq
+Loaded seqs file:  RBNS_training/RBP1_80nM.seq
+Loaded seqs file:  RBNS_training/RBP1_320nM.seq
+Loaded seqs file:  RBNS_training/RBP1_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0874
+Epoch [2/5], Loss: 0.0887
+Epoch [3/5], Loss: 0.0873
+Epoch [4/5], Loss: 0.0755
+Epoch [5/5], Loss: 0.0845
+Start evaluate!
+Pearson correlation: 0.19141368567943573
+Elapsed Time: 100.26282024383545 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP2_input.seq
+Loaded seqs file:  RBNS_training/RBP2_5nM.seq
+Loaded seqs file:  RBNS_training/RBP2_20nM.seq
+Loaded seqs file:  RBNS_training/RBP2_80nM.seq
+Loaded seqs file:  RBNS_training/RBP2_320nM.seq
+Loaded seqs file:  RBNS_training/RBP2_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0791
+Epoch [2/5], Loss: 0.0817
+Epoch [3/5], Loss: 0.0826
+Epoch [4/5], Loss: 0.0824
+Epoch [5/5], Loss: 0.0777
+Start evaluate!
+Pearson correlation: 0.2435232698917389
+Elapsed Time: 96.66121125221252 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP3_input.seq
+Loaded seqs file:  RBNS_training/RBP3_5nM.seq
+Loaded seqs file:  RBNS_training/RBP3_20nM.seq
+Loaded seqs file:  RBNS_training/RBP3_80nM.seq
+Loaded seqs file:  RBNS_training/RBP3_320nM.seq
+Loaded seqs file:  RBNS_training/RBP3_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0870
+Epoch [2/5], Loss: 0.0741
+Epoch [3/5], Loss: 0.0788
+Epoch [4/5], Loss: 0.0803
+Epoch [5/5], Loss: 0.0811
+Start evaluate!
+Pearson correlation: 0.07761137932538986
+Elapsed Time: 95.94858598709106 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP4_input.seq
+Loaded seqs file:  RBNS_training/RBP4_5nM.seq
+Loaded seqs file:  RBNS_training/RBP4_20nM.seq
+Loaded seqs file:  RBNS_training/RBP4_80nM.seq
+Loaded seqs file:  RBNS_training/RBP4_320nM.seq
+Loaded seqs file:  RBNS_training/RBP4_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0887
+Epoch [2/5], Loss: 0.0675
+Epoch [3/5], Loss: 0.0810
+Epoch [4/5], Loss: 0.0794
+Epoch [5/5], Loss: 0.0821
+Start evaluate!
+Pearson correlation: 0.08996191620826721
+Elapsed Time: 96.99960136413574 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP5_input.seq
+Loaded seqs file:  RBNS_training/RBP5_5nM.seq
+Loaded seqs file:  RBNS_training/RBP5_20nM.seq
+Loaded seqs file:  RBNS_training/RBP5_80nM.seq
+Loaded seqs file:  RBNS_training/RBP5_320nM.seq
+Loaded seqs file:  RBNS_training/RBP5_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0738
+Epoch [2/5], Loss: 0.0761
+Epoch [3/5], Loss: 0.0801
+Epoch [4/5], Loss: 0.0881
+Epoch [5/5], Loss: 0.0801
+Start evaluate!
+Pearson correlation: 0.13743123412132263
+Elapsed Time: 95.58374047279358 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP6_input.seq
+Loaded seqs file:  RBNS_training/RBP6_5nM.seq
+Loaded seqs file:  RBNS_training/RBP6_20nM.seq
+Loaded seqs file:  RBNS_training/RBP6_80nM.seq
+Loaded seqs file:  RBNS_training/RBP6_320nM.seq
+Loaded seqs file:  RBNS_training/RBP6_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0724
+Epoch [2/5], Loss: 0.0769
+Epoch [3/5], Loss: 0.0872
+Epoch [4/5], Loss: 0.0789
+Epoch [5/5], Loss: 0.0810
+Start evaluate!
+Pearson correlation: 0.15711914002895355
+Elapsed Time: 96.60965514183044 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP7_input.seq
+Loaded seqs file:  RBNS_training/RBP7_5nM.seq
+Loaded seqs file:  RBNS_training/RBP7_20nM.seq
+Loaded seqs file:  RBNS_training/RBP7_80nM.seq
+Loaded seqs file:  RBNS_training/RBP7_320nM.seq
+Loaded seqs file:  RBNS_training/RBP7_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0760
+Epoch [2/5], Loss: 0.0654
+Epoch [3/5], Loss: 0.0717
+Epoch [4/5], Loss: 0.0821
+Epoch [5/5], Loss: 0.0741
+Start evaluate!
+Pearson correlation: -0.028855331242084503
+Elapsed Time: 95.87125730514526 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP8_input.seq
+Loaded seqs file:  RBNS_training/RBP8_5nM.seq
+Loaded seqs file:  RBNS_training/RBP8_20nM.seq
+Loaded seqs file:  RBNS_training/RBP8_80nM.seq
+Loaded seqs file:  RBNS_training/RBP8_320nM.seq
+Loaded seqs file:  RBNS_training/RBP8_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0794
+Epoch [2/5], Loss: 0.0806
+Epoch [3/5], Loss: 0.0827
+Epoch [4/5], Loss: 0.0822
+Epoch [5/5], Loss: 0.0790
+Start evaluate!
+Pearson correlation: 0.017405562102794647
+Elapsed Time: 96.04784226417542 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP9_input.seq
+Loaded seqs file:  RBNS_training/RBP9_5nM.seq
+Loaded seqs file:  RBNS_training/RBP9_20nM.seq
+Loaded seqs file:  RBNS_training/RBP9_80nM.seq
+Loaded seqs file:  RBNS_training/RBP9_320nM.seq
+Loaded seqs file:  RBNS_training/RBP9_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0767
+Epoch [2/5], Loss: 0.0833
+Epoch [3/5], Loss: 0.0969
+Epoch [4/5], Loss: 0.0775
+Epoch [5/5], Loss: 0.0798
+Start evaluate!
+Pearson correlation: -0.04185060039162636
+Elapsed Time: 104.87640309333801 seconds
+Run with Hyperparams:
+ Seqs per file: 16000 , Batch size: 128 , Epochs: 5 , Learning Rate: 0.001
+Load Data!
+Loaded seqs file:  RBNS_training/RBP10_input.seq
+Loaded seqs file:  RBNS_training/RBP10_5nM.seq
+Loaded seqs file:  RBNS_training/RBP10_20nM.seq
+Loaded seqs file:  RBNS_training/RBP10_80nM.seq
+Loaded seqs file:  RBNS_training/RBP10_320nM.seq
+Loaded seqs file:  RBNS_training/RBP10_1300nM.seq
+Start Training!
+Epoch [1/5], Loss: 0.0796
+Epoch [2/5], Loss: 0.0780
+Epoch [3/5], Loss: 0.0801
+Epoch [4/5], Loss: 0.0871
+Epoch [5/5], Loss: 0.0888
+Start evaluate!
+Pearson correlation: 0.007833873853087425
+Elapsed Time: 94.75425982475281 seconds
