@@ -1,55 +1,11 @@
 import torch.nn as nn
 import torch.nn.init as init
 
-# Recreation attempt of DeepSELEX design.
-# The performance aren't cloes to what the papers says it should be, so something in implementation may be wrong.
-class DeepSELEXModel(nn.Module):
-    def __init__(self, inputShape = (20,4), classes = 6):
-        super(DeepSELEXModel, self).__init__()
-        kernelsPerConv = 512
-        poolKernelStride = 5
-        # First Conv1d layer with kernel size 3
-        self.conv_layer = nn.Conv1d(in_channels=4, out_channels=kernelsPerConv, kernel_size=8, stride=1, padding=4, bias=True)
-        init.normal_(self.conv_layer.weight)
-        init.normal_(self.conv_layer.bias)
-        self.relu = nn.ReLU()
-        self.maxpool = nn.MaxPool1d(kernel_size=poolKernelStride, stride=poolKernelStride)
-        self.flatten = nn.Flatten()
 
-        # Fully connected layers
-        self.fc_layers = nn.Sequential(
-            nn.Linear(kernelsPerConv * (inputShape[0] // 5), 64),
-            nn.ReLU(),
-            nn.Dropout(0.65),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Dropout(0.65),
-            nn.Linear(32, 32),
-            nn.ReLU(),
-            nn.Dropout(0.65),
-            nn.Linear(32, classes),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        # transpose the matrix
-        x = x.permute(0, 2, 1)
-
-        # Apply the three Conv1d layers with different kernel sizes
-        x = self.conv_layer(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.flatten(x)
-        # Reshape x for fully connected layers
-        # x = x.view(x.size(0), -1)
-
-        # Apply fully connected layers
-        x = self.fc_layers(x)
-        return x
 
 # Simple Model, just input to hidden layers and outputs classes (based on amount of files given).
 # Runs on the same system that runs DeepSELEX, so it compute using a sliding window.
-# See pearson.csv DeepModel attempts for performance on RBPs, but in general it runs better than DeepSELEX. 
+# See pearson.csv DeepModel attempts for performance on RBPs, but in general it runs better than DeepSELEX reimplemation. 
 class DeepModel(nn.Module):
     def __init__(self, inputShape = (20,4), classes = 6):
         super(DeepModel, self).__init__()
@@ -96,14 +52,15 @@ class DeepConvModel(nn.Module):
         self.conv_layer2 = nn.Conv1d(in_channels=self.conv_chs, out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=2, bias=True)
         self.maxpool2 = nn.MaxPool1d(kernel_size=2, stride=2)
 
+        self.flatten = nn.Flatten()
         # Define the layers
-        input_size = self.conv_chs * (inputShape[0] // 4) * inputShape[1] // 4
+        input_size = self.conv_chs * (inputShape[0] // 4)
         self.input_layer = nn.Linear(input_size, self.hidden_size)
         self.hidden_layer1 = nn.Linear(self.hidden_size, self.hidden_size)
         self.hidden_layer2 = nn.Linear(self.hidden_size, self.hidden_size)
         self.output_layer = nn.Linear(self.hidden_size, classes)
         self.relu = nn.ReLU()
-        # self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         # transpose the matrix
@@ -119,7 +76,7 @@ class DeepConvModel(nn.Module):
         x = self.maxpool2(x)
 
         # Flatten the tensor
-        x = x.view(x.size(0), -1)
+        x = self.flatten(x)
 
         # Fully connected layers
         x = self.relu(self.input_layer(x))
@@ -133,6 +90,54 @@ class DeepConvModel(nn.Module):
 
         return x
 
+# NOTE: Still doesn't work.. I honestly feel like I miss something here.. Try to redesign it to maybe fit, but it still isn't as good as the other models.
+# Recreation attempt of DeepSELEX design.
+# The performance aren't cloes to what the papers says it should be, so something in implementation may be wrong.
+class DeepSELEXModel(nn.Module):
+    def __init__(self, inputShape = (20,4), classes = 6):
+        super(DeepSELEXModel, self).__init__()
+        kernelsPerConv = 512
+        poolKernelStride = 5
+        # First Conv1d layer with kernel size 3
+        self.conv_layer = nn.Conv1d(in_channels=4, out_channels=kernelsPerConv, kernel_size=8, stride=1, padding=4, bias=True)
+        init.normal_(self.conv_layer.weight)
+        init.normal_(self.conv_layer.bias)
+        self.relu = nn.ReLU()
+        self.maxpool = nn.MaxPool1d(kernel_size=poolKernelStride, stride=poolKernelStride)
+        self.flatten = nn.Flatten()
+
+        # Fully connected layers
+        self.fc_layers = nn.Sequential(
+            nn.Linear(kernelsPerConv * (inputShape[0] // 5), 64),
+            nn.ReLU(),
+            nn.Dropout(0.65),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Dropout(0.65),
+            nn.Linear(32, 32),
+            nn.ReLU(),
+            nn.Dropout(0.65),
+            nn.Linear(32, classes),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # transpose the matrix
+        x = x.permute(0, 2, 1)
+
+        # Apply the three Conv1d layers with different kernel sizes
+        x = self.conv_layer(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.flatten(x)
+        # Reshape x for fully connected layers
+        # x = x.view(x.size(0), -1)
+
+        # Apply fully connected layers
+        x = self.fc_layers(x)
+        return x
+
+# Second recreation, still doesn't work as expected..
 class DeepSELEX2(nn.Module):
     def __init__(self, inputShape = (20,4), classes = 6):
         super(DeepSELEX2, self).__init__()
@@ -143,33 +148,41 @@ class DeepSELEX2(nn.Module):
         self.kernel_size = 8
 
         # First Conv1D layer
-        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=self.conv_chs, kernel_size=self.kernel_size, stride = 1, padding= self.kernel_size//2 , bias=True)
-        self.maxpool1 = nn.MaxPool1d(kernel_size=5, stride = None)
-
+        self.conv_layer = nn.Conv1d(in_channels=inputShape[1], out_channels=self.conv_chs, kernel_size=self.kernel_size, stride = 1, padding= self.kernel_size//2 , bias=True)
+        self.bn = nn.BatchNorm1d(self.conv_chs)  # Add BatchNorm1d here
+        self.maxpool = nn.MaxPool1d(kernel_size=5, stride = None, padding=0, dilation=1, ceil_mode=False)
+        
         # Define the layers
-        input_size =  self.conv_chs * 4
-        self.input_layer = nn.Linear(input_size, 64)
+        input_size =  self.conv_chs * 4 # 4 = RNA letters.
+        self.flatten = nn.Flatten()
+        self.input_layer = nn.Linear(input_size, 64 )
         self.hidden_layer1 = nn.Linear(64, 32)
         self.hidden_layer2 = nn.Linear(32, 32)
         self.output_layer = nn.Linear(32, classes)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
+        self.dropout = nn.Dropout(p=0.65)
+
 
     def forward(self, x):
         # transpose the matrix
         x = x.permute(0, 2, 1)
         # Conv1D layer 1
-        x = self.conv_layer1(x)
+        x = self.conv_layer(x)
+        x = self.bn(x)
         x = self.relu(x)
-        x = self.maxpool1(x)
+        x = self.maxpool(x)
 
         # Flatten the tensor
-        x = x.view(x.size(0), -1)
+        x = self.flatten(x)
 
         # Fully connected layers
         x = self.relu(self.input_layer(x))
+        x = self.dropout(x)
         x = self.relu(self.hidden_layer1(x))
+        x = self.dropout(x)
         x = self.relu(self.hidden_layer2(x))
+        x = self.dropout(x)
 
         # Output layer
         x = self.output_layer(x)

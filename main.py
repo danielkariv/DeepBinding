@@ -21,7 +21,7 @@ torch.manual_seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def createModel(inputShape, classesNum):
-    model = DeepSELEX2(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
+    model = DeepModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
     # summary(model, inputShape)
     return model
 
@@ -49,8 +49,8 @@ def trainModel(rbns_file_paths):
     seqs_per_file = 15000
     batch_size = 64
     num_epochs = 30
-    learning_rate = 0.001
-    weight_decay= 0.00001
+    learning_rate = 1e-3
+    weight_decay= 1e-5
     betas=(0.9,0.999)
     test_ratio=0.3
     patience=3
@@ -63,8 +63,8 @@ def trainModel(rbns_file_paths):
     model = createModel(inputShape, classesNum)
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    #optimizer = optim.Adam(model.parameters(), lr = learning_rate, weight_decay = weight_decay, betas = betas)
-    optimizer = optim.Adam(model.parameters(), lr = learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr = learning_rate, weight_decay = weight_decay, betas = betas, amsgrad=False)
+    # optimizer = optim.Adam(model.parameters(), lr = learning_rate)
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: min(1.0, epoch / warmup_epochs))
 
     best_loss = float('inf')
@@ -84,7 +84,6 @@ def trainModel(rbns_file_paths):
 
             # Forward pass
             outputs = model(batch_data)
-
             # Calculate the loss
             loss = criterion(outputs, targets)
 
@@ -113,7 +112,7 @@ def trainModel(rbns_file_paths):
 
                 # Forward pass
                 outputs = model(batch_data)
-
+                
                 # Calculate the loss
                 loss = criterion(outputs, targets)
 
@@ -146,10 +145,15 @@ def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, inputS
     print(f'Start evaluate!')
     # Create the custom dataset
     eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, RNCMPT_training_path, inputShape[0])
-    eval_loader = DataLoader(eval_dataset, batch_size=1, shuffle=False) # TODO: support multiple sequences at once, batch_size > 1 (GPU can support with best speed at 512 or 1024, could take 15 seconds instead of few minutes)
+    eval_loader = DataLoader(eval_dataset, batch_size=1, shuffle=False) # TODO: support multiple sequences at once, batch_size > 1 (GPU can support with best speed at 512 or 1024, could run in seconds instead of few minutes)
 
     # Set the model to evaluation mode
     model.eval()
+    resultsCSV = 'results.csv'
+    with open(resultsCSV, 'w', newline='') as file:
+        # Create a CSV writer object
+        writer = csv.writer(file)
+        writer.writerow(['RBP Results, sample takes 6 rows (for each cycle)'])
     # Evaluation loop
     predicts, truths = [], []
     with torch.no_grad():
@@ -184,10 +188,22 @@ def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, inputS
 
             # Calculate the predicted_score using the formula
             column_0 = predicted_columns[:, 0]
+            column_1 = predicted_columns[:, 1]
+            column_2 = predicted_columns[:, 2]
             column_3 = predicted_columns[:, 3]
             column_4 = predicted_columns[:, 4]
-            
-            predicted_score = -np.min(column_0) + np.max(column_3) + np.max(column_4) # TODO: because of the changing amount of files=classes, We prorbably needs to drift the column_3, column_4 to be in the exact range we expecting to get values from.
+            column_5 = predicted_columns[:, 5]
+            # NOTE: Set True so it will print the windows values. Useful to debug model outputs.
+            if False:
+                # Open the file in write mode
+                with open(resultsCSV, 'a', newline='') as file:
+                    # Create a CSV writer object
+                    writer = csv.writer(file)
+                    # Write each list as a row in the CSV file
+                    writer.writerows([column_0, column_1, column_2, column_3, column_4, column_5])
+
+            # TODO: because of the changing amount of files=classes, We prorbably shold drift score using differnet columns than column_3, column_4 to be in the exact range we expecting to get values from.
+            predicted_score = -np.min(column_0) + np.max(column_3) + np.max(column_4) 
             predicts.append(predicted_score)
 
             # Save targets.
@@ -195,7 +211,7 @@ def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, inputS
             for target in targets:
                 truths.append(target[0]) 
 
-            if count % 25000 == 0: # TODO: hardcoded.
+            if count % 25000 == 0: # TODO: hardcoded (how many to pass before printing progress).
                 print(f'Score: {predicted_score}, [{count}/{total}]')
 
     # Open the file in write mode
@@ -242,8 +258,8 @@ def find_rbp_files(dir_path, rbp_num):
 
 # helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
 def RunOverAll():
-    num_rbns_files = 16
-    dir_path = '.'
+    num_rbns_files = 6
+    dir_path = 'E:/RNA_DATASET'
     with open('pearson.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         # write row.
@@ -262,8 +278,12 @@ def RunOverAll():
         elapsed_time = end_time - start_time
         train_time = elapsed_time
         print(f"Elapsed Time for training: {elapsed_time} seconds")
+
+
         start_time = time.time()
+
         pearson_correlation = evaluateModel(model, RNAcompete_sequences_path_rbp, RNCMPT_training_path_rbp, inputShape, classesNum, output_path=f'outputs/RBP{rbp_num}_output.csv')
+
         end_time = time.time()
         elapsed_time = end_time - start_time
         evalute_time = elapsed_time

@@ -37,7 +37,7 @@ class RBNSDataset(Dataset):
         self.nrows_per_file = nrows_per_file
 
         self.file_seqs, self.file_targets, self.cumulative_lengths = self._load_data()
-        print(self.file_seqs, len(self.file_seqs))
+        print('Seqs loaded: ', len(self.file_seqs))
     def __len__(self):
         return len(self.file_seqs)
     
@@ -59,22 +59,35 @@ class RBNSDataset(Dataset):
             if self.nrows_per_file >= 0:
                 # Select the most frequent sequences up to nrows_per_file
                 file_data = file_data.head(self.nrows_per_file)
-            total_added = 0
-            # Iterate through each row and add RNA sequences based on their counts
-            for _, row in file_data.iterrows():
-                sequence = row['RNA']
-                count = row['Counts']
-                # Add the sequence 'count' number of times to the data_list
-                data_list.extend([sequence] * count)
-                total_added += count
-                # Create truth/target/outputs for the samples, based on the file index.
+            is_duplicate_seqs = True
+            if is_duplicate_seqs: # Loads top seqeunces, duplicate them based on the count. (NOTE: May have worse performance, still figure it out.)
+                total_added = 0
+                # Iterate through each row and add RNA sequences based on their counts
+                for _, row in file_data.iterrows():
+                    sequence = row['RNA']
+                    count = row['Counts']
+                    # Add the sequence 'count' number of times to the data_list
+                    data_list.extend([sequence] * count)
+                    total_added += count
+                    # Create truth/target/outputs for the samples, based on the file index.
+                    target = [index]
+                    target_onehot = one_hot_encoding(target, nucleotides, 1, 0)[0]
+                    # Add the one-hot encoded target 'count' number of times to the target_list
+                    target_list.extend([target_onehot] * count)
+                    if total_added >= self.nrows_per_file:
+                        break
+                
+                # Save lengths for use in _get_file_index (TODO: maybe I don't it, because of targets, or we could use it to make the memory usage lower)
+                cumulative_lengths.append(cumulative_lengths[-1] + total_added)
+            else: # load the top sequences, ignoring the count. (NOTE: Perforamance still checked)
+                data_list.extend(file_data['RNA'])
+                count = len(file_data['RNA'])
                 target = [index]
                 target_onehot = one_hot_encoding(target, nucleotides, 1, 0)[0]
                 # Add the one-hot encoded target 'count' number of times to the target_list
                 target_list.extend([target_onehot] * count)
-            
-            # Save lengths for use in _get_file_index (TODO: maybe I don't it, because of targets, or we could use it to make the memory usage lower)
-            cumulative_lengths.append(cumulative_lengths[-1] + total_added)
+                # Save lengths for use in _get_file_index (TODO: maybe I don't it, because of targets, or we could use it to make the memory usage lower)
+                cumulative_lengths.append(cumulative_lengths[-1] + count)
 
             print('Loaded seqs file: ', file_path)
         
