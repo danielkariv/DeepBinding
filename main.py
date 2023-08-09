@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 import csv
@@ -48,7 +49,7 @@ def trainModel(rbns_file_paths):
     # Hyperparams:
     seqs_per_file = 15000
     batch_size = 64
-    num_epochs = 30
+    num_epochs = 5
     learning_rate = 1e-3
     weight_decay= 1e-5
     betas=(0.9,0.999)
@@ -141,29 +142,24 @@ def trainModel(rbns_file_paths):
     
     return model, inputShape, classesNum
 
-def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, inputShape, classesNum, output_path = 'output_file.csv'):
+def predictModel(model, RNAcompete_sequences_path, inputShape, classesNum, output_path = 'output_file.csv'):
     print(f'Start evaluate!')
     # Create the custom dataset
-    eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, RNCMPT_training_path, inputShape[0])
+    eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, inputShape[0])
     eval_loader = DataLoader(eval_dataset, batch_size=1, shuffle=False) # TODO: support multiple sequences at once, batch_size > 1 (GPU can support with best speed at 512 or 1024, could run in seconds instead of few minutes)
 
     # Set the model to evaluation mode
     model.eval()
-    resultsCSV = 'results.csv'
-    with open(resultsCSV, 'w', newline='') as file:
-        # Create a CSV writer object
-        writer = csv.writer(file)
-        writer.writerow(['RBP Results, sample takes 6 rows (for each cycle)'])
     # Evaluation loop
-    predicts, truths = [], []
+    predicts = []
     with torch.no_grad():
         total = len(eval_loader)
         count = 0
-        for sequences, targets in eval_loader:
-            count += 1
+        for sequences in eval_loader:
+            count += len(sequences)
             sequences = sequences.to(device)
             sequence = sequences[0] # TODO: support multiple sequences at once, batch_size > 1
-                
+            
             # Run sequences in a sliding window, sized 20 (as in the training set)
             window_size = inputShape[0]
             stride = 1
@@ -193,23 +189,10 @@ def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, inputS
             column_3 = predicted_columns[:, 3]
             column_4 = predicted_columns[:, 4]
             column_5 = predicted_columns[:, 5]
-            # NOTE: Set True so it will print the windows values. Useful to debug model outputs.
-            if False:
-                # Open the file in write mode
-                with open(resultsCSV, 'a', newline='') as file:
-                    # Create a CSV writer object
-                    writer = csv.writer(file)
-                    # Write each list as a row in the CSV file
-                    writer.writerows([column_0, column_1, column_2, column_3, column_4, column_5])
 
             # TODO: because of the changing amount of files=classes, We prorbably shold drift score using differnet columns than column_3, column_4 to be in the exact range we expecting to get values from.
             predicted_score = -np.min(column_0) + np.max(column_3) + np.max(column_4) 
             predicts.append(predicted_score)
-
-            # Save targets.
-            targets = targets.tolist()
-            for target in targets:
-                truths.append(target[0]) 
 
             if count % 25000 == 0: # TODO: hardcoded (how many to pass before printing progress).
                 print(f'Score: {predicted_score}, [{count}/{total}]')
@@ -224,6 +207,9 @@ def evaluateModel(model, RNAcompete_sequences_path, RNCMPT_training_path, inputS
         for row in predicts_list:
             writer.writerow(row)
 
+    return predicts_list
+
+def pearson_compare(predicts, truths):
     # Convert the lists to tensors
     epsilon = 1e-9  # A small value to avoid division by zero
     predicts_tensor = torch.tensor(predicts) + epsilon
@@ -255,10 +241,9 @@ def find_rbp_files(dir_path, rbp_num):
     
     return sorted(rbp_files, key=extract_numeric_value)
 
-
 # helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
 def RunOverAll():
-    num_rbns_files = 6
+    num_rbns_files = 16
     dir_path = 'E:/RNA_DATASET'
     with open('pearson.csv', 'a', newline='') as file:
         writer = csv.writer(file)
@@ -282,21 +267,55 @@ def RunOverAll():
 
         start_time = time.time()
 
-        pearson_correlation = evaluateModel(model, RNAcompete_sequences_path_rbp, RNCMPT_training_path_rbp, inputShape, classesNum, output_path=f'outputs/RBP{rbp_num}_output.csv')
+        predicts = predictModel(model, RNAcompete_sequences_path_rbp, inputShape, classesNum, output_path=f'outputs/RBP{rbp_num}_output.csv')
+        with open(RNCMPT_training_path_rbp, 'r') as f:
+            targets = [float(line.strip()) for line in f.readlines()]
+        pearson_correlation = pearson_compare(predicts, targets)
 
         end_time = time.time()
         elapsed_time = end_time - start_time
         evalute_time = elapsed_time
-        print(f"Elapsed Time for evaluating: {elapsed_time} seconds")
+        print(f"Elapsed Time for predicts: {elapsed_time} seconds")
         # Open the file in write mode
         with open('pearson.csv', 'a', newline='') as file:
             writer = csv.writer(file)
             # write row.
             writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED])
 
+def receiveArgs():
+    args_count = len(sys.argv) - 1  # Ignore the 1st, it is the script name.
+    if args_count >= 6 and args_count <= 8: # includes: ofile, RNCMPT, input, RBNS1, RBNS2, .. RBNS5
+        ofile = sys.argv[1]
+        RNCMPT = sys.argv[2]
+        RBNS = sys.argv[3:] # Should be sorted by how it given(for example: input, 5nm, ... ,3200nm)
+        print(ofile, RNCMPT, RBNS)
+        return ofile, RNCMPT, RBNS
+    else:
+        print("No correct arguments provided.")
+        sys.exit(1) # Exit with an error status
+
 if __name__ == '__main__':
     RunOverAll()
-            
+    exit()
+    ## Commend like this need to be written (basically as we instructed):
+    ## NOTE COMMEND that runs it.
+    ## 'python main.py test.txt datasets\RNAcompete_sequences.txt datasets\RBNS_training\RBP1_input.seq datasets\RBNS_training\RBP1_5nm.seq datasets\RBNS_training\RBP1_20nm.seq datasets\RBNS_training\RBP1_80nm.seq datasets\RBNS_training\RBP1_320nm.seq datasets\RBNS_training\RBP1_1300nm.seq'
+    ofile, RNCMPT, RBNS = receiveArgs()
 
+    start_time = time.time()
 
-        
+    model, inputShape, classesNum = trainModel(RBNS)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    train_time = elapsed_time
+    print(f"Elapsed Time for training: {elapsed_time} seconds")
+
+    start_time = time.time()
+
+    predicts = predictModel(model, RNCMPT, inputShape, classesNum, output_path=ofile)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    evalute_time = elapsed_time
+    print(f"Elapsed Time for predicts: {elapsed_time} seconds")

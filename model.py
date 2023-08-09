@@ -191,7 +191,6 @@ class DeepSELEX2(nn.Module):
 
         return x
 
-
 # Try Transformer based on ChatGPT.
 class TransformerModel(nn.Module):
     def __init__(self, inputShape=(20, 4), classes=6, d_model=32, nhead=4, num_encoder_layers=2):
@@ -219,3 +218,63 @@ class TransformerModel(nn.Module):
         x = self.output_layer(x)
         
         return x
+
+
+# Trying to do Multi Conv1D layers at once, and then sending them to hidden layers
+class DeepMultiConvModel(nn.Module):
+    def __init__(self, inputShape=(20, 4), classes=6):
+        super(DeepMultiConvModel, self).__init__()
+
+        self.hidden_size = 32
+        self.conv_chs = 128
+        self.kernel_size = 4
+
+        # First Conv1D layer
+        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=self.conv_chs, kernel_size=5, stride=1, padding=2, bias=True)
+        self.maxpool1 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        # Second Conv1D layer
+        self.conv_layer2 = nn.Conv1d(in_channels=self.conv_chs, out_channels=self.conv_chs, kernel_size=8, stride=1, padding=2, bias=True)
+        self.maxpool2 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        # Third Conv1D layer
+        self.conv_layer3 = nn.Conv1d(in_channels=self.conv_chs, out_channels=self.conv_chs, kernel_size=11, stride=1, padding=2, bias=True)
+        self.maxpool3 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        self.flatten = nn.Flatten()
+        # Define the layers
+        input_size = self.conv_chs * (inputShape[0] // 8) * 3  # Adjust for three Conv1d layers
+        self.hidden_layer = nn.Linear(input_size, self.hidden_size)
+        self.output_layer = nn.Linear(self.hidden_size, classes)
+        self.relu = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        # Transpose the matrix
+        x = x.permute(0, 2, 1)
+        
+        # Conv1D layer 1
+        x1 = self.conv_layer1(x)
+        x1 = self.relu(x1)
+        x1 = self.maxpool1(x1)
+
+        # Conv1D layer 2
+        x2 = self.conv_layer2(x1)
+        x2 = self.relu(x2)
+        x2 = self.maxpool2(x2)
+
+        # Conv1D layer 3
+        x3 = self.conv_layer3(x2)
+        x3 = self.relu(x3)
+        x3 = self.maxpool3(x3)
+
+        # Flatten and concatenate
+        x_combined = torch.cat((self.flatten(x1), self.flatten(x2), self.flatten(x3)), dim=1)
+
+        # Fully connected layers
+        x_combined = self.relu(self.hidden_layer(x_combined))
+
+        # Output layer
+        x_combined = self.output_layer(x_combined)
+
+        return x_combined
