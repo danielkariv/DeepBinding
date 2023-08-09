@@ -9,3 +9,4 @@ RNAcompete_sequences.txt
 *.pyc
 results.csv
 output_file.csv
+runs/

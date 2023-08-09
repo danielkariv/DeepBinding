@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader , SubsetRandomSampler
 from torchsummary import summary
 import pandas as pd
 import numpy as np
-
+from tensorboardX import SummaryWriter
 from model import *
 from datasets import RBNSDataset, RNCMPTDataset
 # Set the seed for PyTorch
@@ -20,9 +20,11 @@ print('Seed: ',SEED)
 torch.manual_seed(SEED)
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Create a summary writer
+tensorboard_writer = SummaryWriter() # NOTE: See graphs when running: tensorboard --logdir=runs, and then entering the localhost web-server.
 
 def createModel(inputShape, classesNum):
-    model = TransformerModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
+    model = DeepMultiConvModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
     # summary(model, inputShape)
     return model
 
@@ -49,7 +51,7 @@ def trainModel(rbns_file_paths):
     # Hyperparams:
     seqs_per_file = 15000
     batch_size = 64
-    num_epochs = 5
+    num_epochs = 30
     learning_rate = 1e-3
     weight_decay= 1e-5
     betas=(0.9,0.999)
@@ -73,8 +75,8 @@ def trainModel(rbns_file_paths):
     
     print('Start Training!')
     # Training loop
-    for epochs in range(num_epochs):
-        print(f'Epoch [{epochs+1}/{num_epochs}]')
+    for epoch in range(num_epochs):
+        print(f'Epoch [{epoch+1}/{num_epochs}]')
         # Training phase
         model.train()
         train_loss = 0.0
@@ -123,6 +125,9 @@ def trainModel(rbns_file_paths):
         # Calculate average validation loss for the epoch
         val_loss /= len(test_loader.dataset)
         
+        tensorboard_writer.add_scalar('Loss/Train', train_loss, epoch)
+        tensorboard_writer.add_scalar('Loss/Validation', val_loss, epoch)
+
         # Early stopping check
         if val_loss < best_loss:
             best_loss = val_loss
@@ -207,14 +212,14 @@ def predictModel(model, RNAcompete_sequences_path, inputShape, classesNum, outpu
         for row in predicts_list:
             writer.writerow(row)
 
-    return predicts_list
+    return predicts
 
 def pearson_compare(predicts, truths):
     # Convert the lists to tensors
     epsilon = 1e-9  # A small value to avoid division by zero
     predicts_tensor = torch.tensor(predicts) + epsilon
     truths_tensor = torch.tensor(truths) + epsilon
-
+    print(len(predicts_tensor), len(truths_tensor))
     combined_tensor = torch.stack((predicts_tensor, truths_tensor), dim=0)
 
     # Calculate Pearson correlation
@@ -272,6 +277,8 @@ def RunOverAll():
             targets = [float(line.strip()) for line in f.readlines()]
         pearson_correlation = pearson_compare(predicts, targets)
 
+        tensorboard_writer.add_scalar('Pearson_Correlation', pearson_correlation, rbp_num)
+
         end_time = time.time()
         elapsed_time = end_time - start_time
         evalute_time = elapsed_time
@@ -281,6 +288,9 @@ def RunOverAll():
             writer = csv.writer(file)
             # write row.
             writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED])
+        
+  
+        
 
 def receiveArgs():
     args_count = len(sys.argv) - 1  # Ignore the 1st, it is the script name.
@@ -296,6 +306,7 @@ def receiveArgs():
 
 if __name__ == '__main__':
     RunOverAll()
+    tensorboard_writer.close()
     exit()
     ## Commend like this need to be written (basically as we instructed):
     ## NOTE COMMEND that runs it.
