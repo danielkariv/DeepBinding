@@ -21,7 +21,7 @@ torch.manual_seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def createModel(inputShape, classesNum):
-    model = DeepModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
+    model = TransformerModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
     # summary(model, inputShape)
     return model
 

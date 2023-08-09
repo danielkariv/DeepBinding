@@ -190,3 +190,32 @@ class DeepSELEX2(nn.Module):
         x = self.sigmoid(x)
 
         return x
+
+
+# Try Transformer based on ChatGPT.
+class TransformerModel(nn.Module):
+    def __init__(self, inputShape=(20, 4), classes=6, d_model=32, nhead=4, num_encoder_layers=2):
+        super(TransformerModel, self).__init__()
+        self.embedding = nn.Linear(inputShape[1], d_model)
+        self.transformer_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead),
+            num_layers=num_encoder_layers
+        )
+        self.fc1 = nn.Linear(inputShape[0] * d_model, d_model)
+        self.fc2 = nn.Linear(d_model, d_model)
+        self.output_layer = nn.Linear(d_model, classes)
+        self.relu = nn.ReLU()
+        self.flatten = nn.Flatten()
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(1, 0, 2)  # Reshape for transformer input (seq_len, batch_size, d_model)
+        x = self.transformer_encoder(x)
+        x = x.permute(1, 0, 2)  # Reshape back to (batch_size, seq_len, d_model)
+        
+        x = self.flatten(x)
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.output_layer(x)
+        
+        return x
