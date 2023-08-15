@@ -46,16 +46,69 @@ class DeepConvModel(nn.Module):
         self.kernel_size = 4
 
         # First Conv1D layer
-        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=2, bias=True)
+        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size//2, bias=True)
         self.maxpool1 = nn.MaxPool1d(kernel_size=2, stride=2)
 
         # Second Conv1D layer
-        self.conv_layer2 = nn.Conv1d(in_channels=self.conv_chs, out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=2, bias=True)
+        self.conv_layer2 = nn.Conv1d(in_channels=self.conv_chs, out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size//2, bias=True)
         self.maxpool2 = nn.MaxPool1d(kernel_size=2, stride=2)
 
         self.flatten = nn.Flatten()
         # Define the layers
-        input_size = self.conv_chs * (inputShape[0] // 4)
+        input_size = 1408 # self.conv_chs * (inputShape[0] // 4)
+        self.input_layer = nn.Linear(input_size, self.hidden_size)
+        self.hidden_layer1 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.hidden_layer2 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.output_layer = nn.Linear(self.hidden_size, classes)
+        self.relu = nn.ReLU()
+        # self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        # transpose the matrix
+        x = x.permute(0, 2, 1)
+        # Conv1D layer 1
+        x = self.conv_layer1(x)
+        x = self.relu(x)
+        x = self.maxpool1(x)
+
+        # Conv1D layer 2
+        x = self.conv_layer2(x)
+        x = self.relu(x)
+        x = self.maxpool2(x)
+
+        # Flatten the tensor
+        x = self.flatten(x)
+
+        # Fully connected layers
+        x = self.relu(self.input_layer(x))
+        x = self.relu(self.hidden_layer1(x))
+        x = self.relu(self.hidden_layer2(x))
+
+        # Output layer
+        x = self.output_layer(x)
+        # x = self.softmax(x)
+
+        return x
+
+class DeepConvModel2(nn.Module):
+    def __init__(self, inputShape = (20,4), classes = 6):
+        super(DeepConvModel2, self).__init__()
+
+        self.hidden_size = 128
+        self.conv_chs = 128
+        self.kernel_size = 8
+
+        # First Conv1D layer
+        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size//2, bias=True)
+        self.maxpool1 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        # Second Conv1D layer
+        self.conv_layer2 = nn.Conv1d(in_channels=self.conv_chs, out_channels=self.conv_chs, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size//2, bias=True)
+        self.maxpool2 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        self.flatten = nn.Flatten()
+        # Define the layers
+        input_size = 1408 # self.conv_chs * (inputShape[0] // 4)
         self.input_layer = nn.Linear(input_size, self.hidden_size)
         self.hidden_layer1 = nn.Linear(self.hidden_size, self.hidden_size)
         self.hidden_layer2 = nn.Linear(self.hidden_size, self.hidden_size)
@@ -86,11 +139,10 @@ class DeepConvModel(nn.Module):
 
         # Output layer
         x = self.output_layer(x)
-
         # x = self.softmax(x)
 
         return x
-
+    
 # NOTE: Still doesn't work.. I honestly feel like I miss something here.. Try to redesign it to maybe fit, but it still isn't as good as the other models.
 # Recreation attempt of DeepSELEX design.
 # The performance aren't cloes to what the papers says it should be, so something in implementation may be wrong.
@@ -154,7 +206,7 @@ class DeepSELEX2(nn.Module):
         self.maxpool = nn.MaxPool1d(kernel_size=5, stride = None, padding=0, dilation=1, ceil_mode=False)
         
         # Define the layers
-        input_size =  self.conv_chs * 4 # 4 = RNA letters.
+        input_size =  self.conv_chs * 4 * 2 # 4 = RNA letters, * 2(maybe because of input size 41~2*20?).
         self.flatten = nn.Flatten()
         self.input_layer = nn.Linear(input_size, 64 )
         self.hidden_layer1 = nn.Linear(64, 32)
