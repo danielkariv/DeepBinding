@@ -13,18 +13,161 @@ import pandas as pd
 import numpy as np
 from tensorboardX import SummaryWriter
 from model import *
-from datasets import RBNSDataset, RNCMPTDataset
+import torch
+from torch.utils.data import Dataset
+import pandas as pd
+import numpy as np
+import itertools
+
 # Set the seed for PyTorch
-SEED = random.randrange(0,123456789)
-print('Seed: ',SEED)
+SEED = 93015700 # random.randrange(0,123456789)
+print('Seed: ', SEED)
 torch.manual_seed(SEED)
+np.random.seed(SEED)
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Create a summary writer
 tensorboard_writer = SummaryWriter() # NOTE: See graphs when running: tensorboard --logdir=runs, and then entering the localhost web-server.
 
+def one_hot_encoding(rna_sequence, nucleotides = ['A', 'C', 'G', 'T'], max_length=20, padding_value=0.25):
+    one_hot_sequence = []
+    for nucleotide in rna_sequence:
+        if nucleotide == 'N':
+            encoding = [padding_value] * len(nucleotides)
+        else:
+            encoding = [int(nucleotide == nuc) for nuc in nucleotides]
+        one_hot_sequence.append(encoding)
+
+    # Calculate the amount of padding required on each side
+    total_padding = max_length - len(one_hot_sequence)
+    left_padding = total_padding // 2
+    right_padding = total_padding - left_padding
+
+    # Append padding rows with the desired value on both sides
+    if left_padding > 0:
+        padding_row = [padding_value] * len(nucleotides)
+        padding_rows = [padding_row] * left_padding
+        one_hot_sequence = padding_rows + one_hot_sequence
+
+    if right_padding > 0:
+        padding_row = [padding_value] * len(nucleotides)
+        padding_rows = [padding_row] * right_padding
+        one_hot_sequence = one_hot_sequence + padding_rows
+
+    return np.array(one_hot_sequence)
+
+
+# Custom Dataset to read and process data in chunks
+class RBNSDataset(Dataset):
+    def __init__(self, file_paths, SEED, nrows_per_file = -1):
+        self.file_paths = file_paths
+        self.SEED = SEED
+        self.nrows_per_file = nrows_per_file
+        self.seq_length = 41 # =Max
+        self.file_seqs, self.cumulative_lengths = self._load_data()
+        print('Seqs loaded: ', len(self.file_seqs))
+    def __len__(self):
+        return len(self.file_seqs)
+    
+    def _load_data(self):
+        # Load and concatenate data from multiple files
+        data_list = []
+        cumulative_lengths = [0]  # Store the cumulative lengths of the files
+        # run over all the files and load them.
+        for index in range(len(self.file_paths)):
+            # Get path to file.
+            file_path = self.file_paths[index]
+            # Load it, and getting a sample of it if we limited the amount.
+            file_data = pd.read_csv(file_path, delimiter='\t', header=None, usecols=[0,1])
+            file_data.columns = ['RNA', 'Counts']
+            file_data = file_data.sort_values(by='Counts', ascending=False)
+
+            if self.nrows_per_file >= 0:
+                # Select the most frequent sequences up to nrows_per_file
+                file_data = file_data.head(self.nrows_per_file)
+
+             # Decide if to take one one per row, or based on the count, duplicate it.
+            is_duplicate_seqs = False
+            # Loads top seqeunces, duplicate them based on the count.
+            if is_duplicate_seqs: 
+                total_added = 0
+                # Iterate through each row and add RNA sequences based on their counts
+                for _, row in file_data.iterrows():
+                    sequence = row['RNA']
+                    count = row['Counts']
+                    # Add the sequence 'count' number of times to the data_list
+                    data_list.extend([sequence] * count)
+                    total_added += count
+
+                    if total_added >= self.nrows_per_file:
+                        break
+                
+                cumulative_lengths.append(cumulative_lengths[-1] + total_added)
+            # load the top sequences, ignoring the count.
+            else: 
+                data_list.extend(file_data['RNA'])
+                count = len(file_data['RNA'])
+
+                cumulative_lengths.append(cumulative_lengths[-1] + count)
+
+            print('Loaded seqs file: ', file_path)
+        
+        return data_list, cumulative_lengths
+
+    def _get_file_index(self,index):
+        file_index = sum(1 for length in self.cumulative_lengths if length <= index)
+        return file_index
+    
+    def getClassesNum(self):
+        return len(self.file_paths)
+    
+    def getInputShape(self):
+        input_data, _ = self.__getitem__(0)
+        return input_data.shape
+
+    def __getitem__(self, index):
+        # Access the RNA sequence at the specified index
+        rna_sequence = self.file_seqs[index]
+        
+        # preprocess the RNA Sequence by creating an one hot encoding, with padding and max length (RBNS has sequences with the same size, but in RNCMPT they are different in size and so is needed)
+        preprocessed_rna_sequence = one_hot_encoding(rna_sequence,['A','C','G','T'],max_length=self.seq_length ,padding_value=0.25)
+
+        # Create a one-hot representing of the class (the file it comes from)
+        file_index = self._get_file_index(index)
+        target = [file_index]
+        classes = [index for index in range(len(self.file_paths))]
+        target_onehot = one_hot_encoding(target, classes, 1, 0)[0]
+
+        # Convert the input/ouput to tensors for usage in pytorch.
+        input_data = torch.tensor(preprocessed_rna_sequence, dtype=torch.float32)
+        target = torch.tensor(target_onehot, dtype=torch.float32)
+        
+        return input_data, target
+
+# Custom Dataset to read and process data in chunks
+class RNCMPTDataset(Dataset):
+    def __init__(self, RNAcompete_sequences_path, modelExpectedSeqLength):
+        with open(RNAcompete_sequences_path, 'r') as f:
+            self.seqs_data = f.readlines()
+        # NOTE: because training set has different sizes depending on the RBP, we recieve the expected Sequence length, and use it to pad the sequences that we want to run on.
+        self.modelExpectedSeqLength = modelExpectedSeqLength
+    def __len__(self):
+        return len(self.seqs_data)
+
+    def __getitem__(self, index):
+        # Access the RNA sequence at the specified index
+        rna_sequence = self.seqs_data[index].strip()
+        
+        # Preprocess the RNA Sequence by creating an one hot encoding, with padding and max length
+        preprocessed_rna_sequence = one_hot_encoding(rna_sequence, ['A', 'C', 'G', 'U'], max_length=self.modelExpectedSeqLength, padding_value=0.25)
+        
+        # Convert the input/ouput to tensors for usage in pytorch.
+        input_data = torch.tensor(preprocessed_rna_sequence, dtype=torch.float32)
+
+        return input_data
+
 def createModel(inputShape, classesNum):
-    model = DeepMultiConvModel(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
+    model = DeepSELEX2(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
     # summary(model, inputShape)
     return model
 
@@ -47,172 +190,171 @@ def loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio)
     
     return train_loader, test_loader
 
-def trainModel(rbns_file_paths):
-    # Hyperparams:
-    seqs_per_file = 15000
-    batch_size = 64
-    num_epochs = 30
-    learning_rate = 1e-3
-    weight_decay= 1e-5
-    betas=(0.9,0.999)
-    test_ratio=0.3
-    patience=3
-    warmup_epochs = 5
-    print(f'Run with Hyperparams:\nNumber of Seqs: {seqs_per_file}, Batch_size: {batch_size}, Number of Epochs: {num_epochs},\nLearning Rate: {learning_rate}, Weight Decay: {weight_decay}, Betas: {betas}, Test Ratio: {test_ratio}, Patience: {patience}')
-    
-    print('Load Data!')
-    train_loader, test_loader = loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio)
-    inputShape, classesNum = train_loader.dataset.getInputShape(),train_loader.dataset.getClassesNum()
-    model = createModel(inputShape, classesNum)
-    # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr = learning_rate, weight_decay = weight_decay, betas = betas, amsgrad=False)
-    # optimizer = optim.Adam(model.parameters(), lr = learning_rate)
-    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: min(1.0, epoch / warmup_epochs))
 
-    best_loss = float('inf')
-    patience_counter = 0
-    
-    print('Start Training!')
-    # Training loop
-    for epoch in range(num_epochs):
-        print(f'Epoch [{epoch+1}/{num_epochs}]')
-        # Training phase
-        model.train()
-        train_loss = 0.0
-        for batch_data, targets in train_loader:
-             # Move batch_data and targets to the appropriate device (CPU or GPU) if needed 
-            batch_data = batch_data.to(device)
-            targets = targets.to(device)
+class NormalPipeline:
+    def __init__(self):
+        print('Run with normal pipeline.')
+        
+    def trainModel(self, rbns_file_paths):
+        # Hyperparams:
+        seqs_per_file = 15000
+        batch_size = 64
+        num_epochs = 30
+        learning_rate = 1e-3
+        weight_decay= 1e-5
+        betas=(0.9,0.999)
+        test_ratio=0.3
+        patience=3
+        warmup_epochs = 5
+        print(f'Run with Hyperparams:\nNumber of Seqs: {seqs_per_file}, Batch_size: {batch_size}, Number of Epochs: {num_epochs},\nLearning Rate: {learning_rate}, Weight Decay: {weight_decay}, Betas: {betas}, Test Ratio: {test_ratio}, Patience: {patience}')
+        
+        print('Load Data!')
+        train_loader, test_loader = loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio)
+        inputShape, classesNum = train_loader.dataset.getInputShape(),train_loader.dataset.getClassesNum()
+        model = createModel(inputShape, classesNum)
+        # Define loss function and optimizer
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr = learning_rate, weight_decay = weight_decay, betas = betas, amsgrad=False)
+        # optimizer = optim.Adam(model.parameters(), lr = learning_rate)
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: min(1.0, epoch / warmup_epochs))
 
-            # Forward pass
-            outputs = model(batch_data)
-            # Calculate the loss
-            loss = criterion(outputs, targets)
-
-            # Backward and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # Update the training loss
-            train_loss += loss.item() * batch_data.size(0)  # Accumulate the loss
-
-        # Update scheduler for warmup system.
-        scheduler.step()
-
-        # Calculate average training loss for the epoch
-        train_loss /= len(train_loader.dataset)
-
-        # Validation phase
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for batch_data, targets in test_loader:
+        best_loss = float('inf')
+        patience_counter = 0
+        best_model_weights = None
+        print('Start Training!')
+        # Training loop
+        for epoch in range(num_epochs):
+            print(f'Epoch [{epoch+1}/{num_epochs}]')
+            # Training phase
+            model.train()
+            train_loss = 0.0
+            for batch_data, targets in train_loader:
                 # Move batch_data and targets to the appropriate device (CPU or GPU) if needed 
                 batch_data = batch_data.to(device)
                 targets = targets.to(device)
 
                 # Forward pass
                 outputs = model(batch_data)
-                
                 # Calculate the loss
                 loss = criterion(outputs, targets)
 
-                # Update the validation loss
-                val_loss += loss.item() * batch_data.size(0)  # Accumulate the loss
+                # Backward and optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-        # Calculate average validation loss for the epoch
-        val_loss /= len(test_loader.dataset)
-        
-        tensorboard_writer.add_scalar('Loss/Train', train_loss, epoch)
-        tensorboard_writer.add_scalar('Loss/Validation', val_loss, epoch)
+                # Update the training loss
+                train_loss += loss.item() * batch_data.size(0)  # Accumulate the loss
 
-        # Early stopping check
-        if val_loss < best_loss:
-            best_loss = val_loss
-            patience_counter = 0
-            # Save the best model weights
-            best_model_weights = model.state_dict()
-        else:
-            patience_counter += 1
-        print(f'Loss: {val_loss}, Patience [{patience_counter}/{patience}] (Best Loss: {best_loss})')
-        # Check if early stopping criteria are met
-        if patience_counter >= patience:
-            print("Early stopping! Validation loss didn't improve in the last", patience, "epochs.")
-            break
+            # Update scheduler for warmup system.
+            scheduler.step()
 
-    # Load the best model weights
-    model.load_state_dict(best_model_weights)
-    
-    return model, inputShape, classesNum
+            # Calculate average training loss for the epoch
+            train_loss /= len(train_loader.dataset)
 
-def predictModel(model, RNAcompete_sequences_path, inputShape, classesNum, output_path = 'output_file.csv'):
-    print(f'Start evaluate!')
-    # Create the custom dataset
-    eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, inputShape[0])
-    eval_loader = DataLoader(eval_dataset, batch_size=1, shuffle=False) # TODO: support multiple sequences at once, batch_size > 1 (GPU can support with best speed at 512 or 1024, could run in seconds instead of few minutes)
+            # Validation phase
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for batch_data, targets in test_loader:
+                    # Move batch_data and targets to the appropriate device (CPU or GPU) if needed 
+                    batch_data = batch_data.to(device)
+                    targets = targets.to(device)
 
-    # Set the model to evaluation mode
-    model.eval()
-    # Evaluation loop
-    predicts = []
-    with torch.no_grad():
-        total = len(eval_loader)
-        count = 0
-        for sequences in eval_loader:
-            count += len(sequences)
-            sequences = sequences.to(device)
-            sequence = sequences[0] # TODO: support multiple sequences at once, batch_size > 1
+                    # Forward pass
+                    outputs = model(batch_data)
+                    
+                    # Calculate the loss
+                    loss = criterion(outputs, targets)
+
+                    # Update the validation loss
+                    val_loss += loss.item() * batch_data.size(0)  # Accumulate the loss
+
+            # Calculate average validation loss for the epoch
+            val_loss /= len(test_loader.dataset)
             
-            # Run sequences in a sliding window, sized 20 (as in the training set)
-            window_size = inputShape[0]
-            stride = 1
-            predicted_columns = np.empty((0, classesNum))
+            tensorboard_writer.add_scalar('Loss/Train', train_loss, epoch)
+            tensorboard_writer.add_scalar('Loss/Validation', val_loss, epoch)
 
-            # Collect all windows in a list
-            windows = [sequence[i : i + window_size] for i in range(0, len(sequence) - window_size + 1, stride)]
-            # In case of the window size being bigger than the sequences themself, we send just the sequences, it will pad it if needed.
-            if len(windows) <= 0:
-                windows = [sequence]
-            # Convert the list of windows into a single tensor
-            windows_tensor = torch.stack(windows)
+            # Early stopping check
+            if val_loss < best_loss:
+                best_loss = val_loss
+                patience_counter = 0
+                # Save the best model weights
+                best_model_weights = model.state_dict()
+            else:
+                patience_counter += 1
+            print(f'Loss: {val_loss}, Patience [{patience_counter}/{patience}] (Best Loss: {best_loss})')
+            # Check if early stopping criteria are met
+            if patience_counter >= patience:
+                print("Early stopping! Validation loss didn't improve in the last", patience, "epochs.")
+                break
 
-            # Pass the input through the model to get the predicted scores for all windows
-            predicted_matrices = model(windows_tensor)
+        # Load the best model weights
+        if best_model_weights is not None:
+            model.load_state_dict(best_model_weights)
+        
+        self.model, self.inputShape, self.classesNum = model, inputShape, classesNum
+    
+    def predict(self, RNAcompete_sequences_path, output_path = 'output_file.csv'):
+        print(f'Start evaluate!')
+        # Create the custom dataset
+        eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, self.inputShape[0])
+        eval_loader = DataLoader(eval_dataset, batch_size=128, shuffle=False) # TODO: support multiple sequences at once, batch_size > 1 (GPU can support with best speed at 512 or 1024, could run in seconds instead of few minutes)
 
-            # Convert the predictions to a numpy array
-            predicted_columns = predicted_matrices.cpu().numpy()
+        # Set the model to evaluation mode
+        self.model.eval()
+        # Evaluation loop
+        predicts = []
+        with torch.no_grad():
+            total = len(eval_loader)
+            count = 0
+            for sequences in eval_loader:
+                count += len(sequences)
+                sequences = sequences.to(device)
 
-            # Reshape the predictions to get predicted_scores for each window
-            predicted_columns = predicted_columns.reshape(-1, classesNum)
+                # Pass the entire batch of sequences through the model
+                predicted_matrices = self.model(sequences)
 
-            # Calculate the predicted_score using the formula
-            column_0 = predicted_columns[:, 0]
-            column_1 = predicted_columns[:, 1]
-            column_2 = predicted_columns[:, 2]
-            column_3 = predicted_columns[:, 3]
-            column_4 = predicted_columns[:, 4]
-            column_5 = predicted_columns[:, 5]
+                # Convert the predictions to a numpy array
+                predicted_columns = predicted_matrices.cpu().numpy()
 
-            # TODO: because of the changing amount of files=classes, We prorbably shold drift score using differnet columns than column_3, column_4 to be in the exact range we expecting to get values from.
-            predicted_score = -np.min(column_0) + np.max(column_3) + np.max(column_4) 
-            predicts.append(predicted_score)
+                # Calculate the predicted_scores for each item in the batch
+                batch_scores = []
+                for i in range(len(sequences)):
+                    column_0 = predicted_columns[i, 0]
+                    column_1 = predicted_columns[i, 1]
+                    column_2 = predicted_columns[i, 2]
+                    column_3 = predicted_columns[i, 3]
+                    column_4 = predicted_columns[i, 4]
+                    column_5 = predicted_columns[i, 5]
 
-            if count % 25000 == 0: # TODO: hardcoded (how many to pass before printing progress).
-                print(f'Score: {predicted_score}, [{count}/{total}]')
+                    # TODO: Calculate predicted_score based on your specific formula
+                    # For example:
+                    # predicted_score = -np.min(column_0) + np.max(column_3) + np.max(column_4)
+                    # predicted_score = '\n'.join([f'{value}, ' for value in predicted_columns[i]])
+                    predicted_score = predicted_columns[i]
+                    batch_scores.append(predicted_score)
 
-    # Open the file in write mode
-    with open(output_path, 'w', newline='') as file:
-        # Create a CSV writer object
-        writer = csv.writer(file)
-        # Convert the predicts list to a list of lists
-        predicts_list = [[value] for value in predicts]
-        # Write each list as a row in the CSV file
-        for row in predicts_list:
-            writer.writerow(row)
+                predicts.extend(batch_scores)
 
-    return predicts
+                if count % 25000 == 0: # TODO: hardcoded (how many to pass before printing progress).
+                    print(f'Score: {predicted_score}, [{count}/{total}]')
+
+        # # Open the file in write mode
+        # with open(output_path, 'w', newline='') as file:
+        #     # Create a CSV writer object
+        #     writer = csv.writer(file)
+        #     # Convert the predicts list to a list of lists
+        #     predicts_list = [[value] for value in predicts]
+        #     # Write each list as a row in the CSV file
+        #     for row in predicts_list:
+        #         writer.writerow(row)
+
+        return predicts
+
+import torch.nn.functional as F
+
 
 def pearson_compare(predicts, truths):
     # Convert the lists to tensors
@@ -249,7 +391,7 @@ def find_rbp_files(dir_path, rbp_num):
 # helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
 def RunOverAll():
     num_rbns_files = 16
-    dir_path = 'E:/RNA_DATASET'
+    dir_path = '.'
     with open('pearson.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         # write row.
@@ -261,37 +403,83 @@ def RunOverAll():
         RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
 
         start_time = time.time()
-
-        model, inputShape, classesNum = trainModel(rbns_file_paths_rbp)
-
+        sp = NormalPipeline()
+        sp.trainModel(rbns_file_paths_rbp)
         end_time = time.time()
         elapsed_time = end_time - start_time
         train_time = elapsed_time
         print(f"Elapsed Time for training: {elapsed_time} seconds")
 
-
         start_time = time.time()
-
-        predicts = predictModel(model, RNAcompete_sequences_path_rbp, inputShape, classesNum, output_path=f'outputs/RBP{rbp_num}_output.csv')
-        with open(RNCMPT_training_path_rbp, 'r') as f:
-            targets = [float(line.strip()) for line in f.readlines()]
-        pearson_correlation = pearson_compare(predicts, targets)
-
-        tensorboard_writer.add_scalar('Pearson_Correlation', pearson_correlation, rbp_num)
-
+        predicts = sp.predict(RNAcompete_sequences_path_rbp, output_path=f'outputs/RBP{rbp_num}_output.csv')
         end_time = time.time()
         elapsed_time = end_time - start_time
         evalute_time = elapsed_time
         print(f"Elapsed Time for predicts: {elapsed_time} seconds")
-        # Open the file in write mode
-        with open('pearson.csv', 'a', newline='') as file:
-            writer = csv.writer(file)
-            # write row.
-            writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED])
         
-  
-        
+        # Define the input values (replace these with your actual input values)
+        inputs = [1, 2, 3, 4, 5, 6]
 
+        # Define the possible operations: +, -, or not included (x)
+        operations = ['+', '-', 'x']
+
+        # Generate all possible combinations of operations for the inputs
+        num_inputs = len(inputs)
+        all_combinations = [('x', '-', '-', '+', '+', '+')] # itertools.product(operations, repeat=num_inputs)
+        
+        # Iterate through all combinations
+        # TODO: used for debug. can be disabled when doing real runs.
+        max_pearson_correlation, comb = -1, None # getting max pearson.
+        for combination in all_combinations:
+            print('test: ', combination)
+            with open(RNCMPT_training_path_rbp, 'r') as f:
+                targets = [float(line.strip()) for line in f.readlines()]
+            tests = []
+            for predict in predicts:
+                # Apply each operation to the corresponding input
+                result = 0
+                for i, op in enumerate(combination):
+                    if op == '+':
+                        result += predict[i]
+                    elif op == '-':
+                        result -= inputs[i]
+                tests.append(result)
+
+            # Open the file in write mode
+            # TODO: it suppose to write to the files the results, but the calculations of predictions done outside of the prediction itself.
+            #       It needs some cleanup baiscally to manage it better.
+            with open(f'outputs/RBP{rbp_num}_output.csv', 'w', newline='') as file:
+                # Create a CSV writer object
+                writer = csv.writer(file)
+                # Convert the predicts list to a list of lists
+                predicts_list = [[value] for value in predicts]
+                # Write each list as a row in the CSV file
+                for row in predicts_list:
+                    writer.writerow(row)
+            
+            pearson_correlation = pearson_compare(tests, targets)
+            if max_pearson_correlation < pearson_correlation:
+                max_pearson_correlation = pearson_correlation
+                comb = combination
+            tensorboard_writer.add_scalar('Pearson_Correlation', pearson_correlation, rbp_num)
+            # Open the file in write mode
+            with open('pearson.csv', 'a', newline='') as file:
+                writer = csv.writer(file)
+                # write row.
+                writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED, combination])
+        
+        print('Pearson best: ', max_pearson_correlation, 'With combination: ', comb)
+        # # TODO: used for debug. can be disabled when doing real runs.
+        # with open(RNCMPT_training_path_rbp, 'r') as f:
+        #     targets = [float(line.strip()) for line in f.readlines()]
+        # pearson_correlation = pearson_compare(predicts, targets)
+        # tensorboard_writer.add_scalar('Pearson_Correlation', pearson_correlation, rbp_num)
+        # # Open the file in write mode
+        # with open('pearson.csv', 'a', newline='') as file:
+        #     writer = csv.writer(file)
+        #     # write row.
+        #     writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED])
+        
 def receiveArgs():
     args_count = len(sys.argv) - 1  # Ignore the 1st, it is the script name.
     if args_count >= 6 and args_count <= 8: # includes: ofile, RNCMPT, input, RBNS1, RBNS2, .. RBNS5
@@ -324,7 +512,7 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    predicts = predictModel(model, RNCMPT, inputShape, classesNum, output_path=ofile)
+    predicts = predictSlidingWindow(model, RNCMPT, inputShape, classesNum, output_path=ofile)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
