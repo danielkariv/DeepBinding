@@ -391,13 +391,13 @@ def find_rbp_files(dir_path, rbp_num):
 
 # helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
 def RunOverAll():
-    dir_path = 'E:/RNA_DATASET'
+    dir_path = '.' # 'E:/RNA_DATASET'
     with open('pearson.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         # write row.
         writer.writerow([f'RBP Num', 'Pearson Correlation', 'Train Time (Seconds)', 'Evalute Time (Seconds)', 'Seed'])
     # Loop through the RBPs and process each one
-    for rbp_num in range(3, 3 + 1):
+    for rbp_num in range(1, 16 + 1):
         rbns_file_paths_rbp = find_rbp_files(dir_path, rbp_num) # Automatically find all the files and send them sorted in the right way.
         RNAcompete_sequences_path_rbp = f"{dir_path}/RNAcompete_sequences.txt"
         RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
@@ -425,7 +425,8 @@ def RunOverAll():
 
         # Generate all possible combinations of operations for the inputs
         num_inputs = len(inputs)
-        all_combinations = itertools.product(operations, repeat=num_inputs) # [('-', 'x', '-', 'x', '-', '+')] 
+        # NOTE: ('x', 'x', 'x', '+', '+', 'x') works the best on most RBPs, expect of those with more than 6 classes(files), there is one of it on 16 RBPs.
+        all_combinations = [('x', 'x', 'x', '+', '+', 'x')]  # itertools.product(operations, repeat=num_inputs)
         
         # Iterate through all combinations
         # TODO: used for debug. can be disabled when doing real runs.
