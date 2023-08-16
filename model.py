@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-
+import torch.nn.functional as F
 
 
 # Simple Model, just input to hidden layers and outputs classes (based on amount of files given).
@@ -332,3 +332,138 @@ class DeepMultiConvModel(nn.Module):
         x_combined = self.output_layer(x_combined)
 
         return x_combined
+
+class TransformerModel2(nn.Module):
+    def __init__(self, inputShape=(20, 4), classes=6, d_model=32, nhead=4, num_encoder_layers=2):
+        super(TransformerModel2, self).__init__()
+        self.embedding = nn.Linear(inputShape[1], d_model)
+        self.transformer_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead),
+            num_layers=num_encoder_layers
+        )
+        self.fc1 = nn.Linear(inputShape[0] * d_model, d_model)
+        self.fc2 = nn.Linear(d_model, d_model)
+        self.output_layer = nn.Linear(d_model, classes)
+        self.relu = nn.ReLU()
+        self.flatten = nn.Flatten()
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(1, 0, 2)  # Reshape for transformer input (seq_len, batch_size, d_model)
+        x = self.transformer_encoder(x)
+        x = x.permute(1, 0, 2)  # Reshape back to (batch_size, seq_len, d_model)
+        
+        x = self.flatten(x)
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        x = self.output_layer(x)
+        
+        return x
+
+
+class SimpleModel(nn.Module):
+    def __init__(self, inputShape=(20, 4), classes=6, num_hidden_layers=2, hidden_size=256):
+        super(SimpleModel, self).__init__()
+        self.num_hidden_layers = num_hidden_layers
+        self.hidden_size = hidden_size
+        
+        self.input_layer = nn.Linear(inputShape[0] * inputShape[1], self.hidden_size)
+        self.hidden_layers = nn.ModuleList([
+            nn.Linear(self.hidden_size, self.hidden_size) for _ in range(self.num_hidden_layers)
+        ])
+        self.output_layer = nn.Linear(self.hidden_size, classes)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)  # Flatten the input
+
+        x = F.relu(self.input_layer(x))
+        for hidden_layer in self.hidden_layers:
+            x = F.relu(hidden_layer(x))
+        x = self.output_layer(x)
+
+        return F.softmax(x, dim=1)
+
+class DeepConvModel3(nn.Module):
+    def __init__(self, inputShape = (20,4), classes = 6, hidden_size = 32, conv_chs = 128, kernel_size = 4) :
+        super(DeepConvModel3, self).__init__()
+        # First Conv1D layer
+        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=conv_chs, kernel_size=kernel_size, stride=1, padding=kernel_size//2, bias=True)
+        self.maxpool1 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        # Second Conv1D layer
+        self.conv_layer2 = nn.Conv1d(in_channels=conv_chs, out_channels=conv_chs, kernel_size=kernel_size, stride=1, padding=kernel_size//2, bias=True)
+        self.maxpool2 = nn.MaxPool1d(kernel_size=2, stride=2)
+
+        self.flatten = nn.Flatten()
+        # Define the layers
+        input_size = conv_chs * 11 # 11= for some reason 41=42->which is 42/2=21 -> 21/2=11  # conv_chs * (((inputShape[0]//2)+1) // 4) 
+        self.input_layer = nn.Linear(input_size, hidden_size)
+        self.hidden_layer1 = nn.Linear(hidden_size, hidden_size)
+        self.hidden_layer2 = nn.Linear(hidden_size, hidden_size)
+        self.output_layer = nn.Linear(hidden_size, classes)
+        self.relu = nn.ReLU()
+        # self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        # transpose the matrix
+        x = x.permute(0, 2, 1)
+        # Conv1D layer 1
+        x = self.conv_layer1(x)
+        x = self.relu(x)
+        x = self.maxpool1(x)
+
+        # Conv1D layer 2
+        x = self.conv_layer2(x)
+        x = self.relu(x)
+        x = self.maxpool2(x)
+
+        # Flatten the tensor
+        x = self.flatten(x)
+
+        # Fully connected layers
+        x = self.relu(self.input_layer(x))
+        x = self.relu(self.hidden_layer1(x))
+        x = self.relu(self.hidden_layer2(x))
+
+        # Output layer
+        x = self.output_layer(x)
+        # x = self.softmax(x)
+
+        return x
+    
+class DeepConvModel4(nn.Module):
+    def __init__(self, inputShape = (20,4), classes = 6, hidden_size = 32, conv_chs = 128, kernel_size = 4) :
+        super(DeepConvModel4, self).__init__()
+        # First Conv1D layer
+        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=conv_chs, kernel_size=kernel_size, stride=1, padding=kernel_size//2, bias=True)
+        self.flatten = nn.Flatten()
+        # Define the layers
+        input_size = conv_chs
+        self.input_layer = nn.Linear(input_size, hidden_size)
+        self.hidden_layer1 = nn.Linear(hidden_size, hidden_size)
+        self.hidden_layer2 = nn.Linear(hidden_size, hidden_size)
+        self.output_layer = nn.Linear(hidden_size, classes)
+        self.relu = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        # transpose the matrix
+        x = x.permute(0, 2, 1)
+        # Conv1D layer 1
+        x = self.conv_layer1(x)
+        x, _ = torch.max(x, dim=2)  # along the time dimension
+        x = self.relu(x)
+
+        # Flatten the tensor
+        x = self.flatten(x)
+
+        # Fully connected layers
+        x = self.relu(self.input_layer(x))
+        x = self.relu(self.hidden_layer1(x))
+        x = self.relu(self.hidden_layer2(x))
+
+        # Output layer
+        x = self.output_layer(x)
+        # x = self.softmax(x)
+
+        return x

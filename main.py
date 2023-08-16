@@ -167,8 +167,9 @@ class RNCMPTDataset(Dataset):
         return input_data
 
 def createModel(inputShape, classesNum):
-    model = DeepSELEX2(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
-    # summary(model, inputShape)
+    model = DeepConvModel4(inputShape,classesNum,128,512,4).to(device) 
+    #DeepSELEX2(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
+    summary(model, inputShape)
     return model
 
 def loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio):
@@ -390,14 +391,13 @@ def find_rbp_files(dir_path, rbp_num):
 
 # helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
 def RunOverAll():
-    num_rbns_files = 16
-    dir_path = '.'
+    dir_path = 'E:/RNA_DATASET'
     with open('pearson.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         # write row.
         writer.writerow([f'RBP Num', 'Pearson Correlation', 'Train Time (Seconds)', 'Evalute Time (Seconds)', 'Seed'])
     # Loop through the RBPs and process each one
-    for rbp_num in range(1, num_rbns_files + 1):
+    for rbp_num in range(3, 3 + 1):
         rbns_file_paths_rbp = find_rbp_files(dir_path, rbp_num) # Automatically find all the files and send them sorted in the right way.
         RNAcompete_sequences_path_rbp = f"{dir_path}/RNAcompete_sequences.txt"
         RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
@@ -425,7 +425,7 @@ def RunOverAll():
 
         # Generate all possible combinations of operations for the inputs
         num_inputs = len(inputs)
-        all_combinations = [('x', '-', '-', '+', '+', '+')] # itertools.product(operations, repeat=num_inputs)
+        all_combinations = itertools.product(operations, repeat=num_inputs) # [('-', 'x', '-', 'x', '-', '+')] 
         
         # Iterate through all combinations
         # TODO: used for debug. can be disabled when doing real runs.
