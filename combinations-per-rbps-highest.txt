@@ -1,0 +1,8 @@
+combinations that gives the highest correlation for each RBP.
+RBP1: (-/X, -/X, -/X, -/X, -/X, +)
+RBP2: (-/x, -/x, -/x, +, +, -/x)
+RBP3: (-/x/+, -/x, -/x, -/x, +, +)
+RBP4: (-/x, -/x, -/x, -/x ,+, +)
+RBP5: (-/x, -/x, -/x, +, +, -/x)
+RBP6: (-/X, -/X, +, -/X, -/X, +)
+maybe going with ,+,+

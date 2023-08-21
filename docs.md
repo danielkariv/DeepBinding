@@ -68,3 +68,21 @@ Later with RBP1.txt, we can compare to the scores we receives (using RNAcompete_
 Sliding window can be maybe be done with Generators (too big data, needs to happen on fly, per batch).
 model, questionable how to design, it suppose to detect the motifs using the BnS and then we will use it to score the RNAcompete_sequences.txt. Basically making a model for each RBP.
 the scoring itself, doesn't seems to be learnt, and should be somewhat simple. using maybe sliding windows on the RNAcompete, we could score it like that?
+
+# Some debug information:
+Copied from the script: (some files don't neccerally appear when running, need to handle it)
+ NOTE: ('x', 'x', 'x', '+', '+', 'x') works the best on most RBPs, expect of those with more than 6 classes(files), there is one of it on 16 RBPs. or mayabe: [('x', 'x', 'x', '+', '+', '+')] (From what I see, it is worse than just two plus. )
+all_combinations = [('-', '-', '-', '-', '+', '+', '+', '+', '+', '+'), # 0.0831
+                    ('-', '-', '-', '-', '-', '+', '+', '+', '+', '+'), # 0.1150
+                    ('-', '-', '-', '-', '-', '-', '+', '+', '+', '+'), # 0.1395 365-9800
+                    ('-', '-', '-', '-', '-', '+', '+', '+', '+', 'x'), # 0.0612
+                    ('-', '-', '-', '-', 'x', 'x', '+', '+', '+', 'x'), # 0.1092
+                    ('-', '-', '-', '-', 'x', 'x', '+', '+', '+', 'x'), # 0.1092
+                    ('x', 'x', 'x', 'x', 'x', 'x', '+', '+', '+', 'x'), # 0.1092
+                    ('x', 'x', 'x', 'x', 'x', 'x', '+', '+', '+', '+'), # 0.1092
+                    ('x', 'x', 'x', 'x', 'x', '+', '+', '+', '+', '+'), # 0.1395 121-9800
+                    ('x', 'x', 'x', 'x', 'x', '+', '+', '+', 'x', 'x'), # 0.1150
+                    ]# itertools.product(operations, repeat=num_inputs)
+
+# What left to try:
+Maybe try looking into the labels of the data. Right now it just based on teh file the sequence comes from, but maybe we could add the number of appearence into the mix. Questionable how to do it, as we do softmax, the max value can be 1.0.

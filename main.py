@@ -2,22 +2,16 @@ import sys
 import os
 import time
 import csv
-import random
+import datetime
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.data import DataLoader , SubsetRandomSampler
-from torchsummary import summary
+from torch.utils.data import Dataset, DataLoader , SubsetRandomSampler
+# from torchsummary import summary
 import pandas as pd
 import numpy as np
-from tensorboardX import SummaryWriter
 from model import *
-import torch
-from torch.utils.data import Dataset
-import pandas as pd
-import numpy as np
-import itertools
 
 # Set the seed for PyTorch
 SEED = 93015700 # random.randrange(0,123456789)
@@ -26,9 +20,8 @@ torch.manual_seed(SEED)
 np.random.seed(SEED)
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# Create a summary writer
-tensorboard_writer = SummaryWriter() # NOTE: See graphs when running: tensorboard --logdir=runs, and then entering the localhost web-server.
 
+# Convert sequence to one-hot encoding, with padding if needed.
 def one_hot_encoding(rna_sequence, nucleotides = ['A', 'C', 'G', 'T'], max_length=20, padding_value=0.25):
     one_hot_sequence = []
     for nucleotide in rna_sequence:
@@ -56,8 +49,7 @@ def one_hot_encoding(rna_sequence, nucleotides = ['A', 'C', 'G', 'T'], max_lengt
 
     return np.array(one_hot_sequence)
 
-
-# Custom Dataset to read and process data in chunks
+# Custom Dataset to read and process data in chunks of RBNS files.
 class RBNSDataset(Dataset):
     def __init__(self, file_paths, SEED, nrows_per_file = -1):
         self.file_paths = file_paths
@@ -144,7 +136,7 @@ class RBNSDataset(Dataset):
         
         return input_data, target
 
-# Custom Dataset to read and process data in chunks
+# Custom Dataset to read and process data in chunks of RNCMPT file.
 class RNCMPTDataset(Dataset):
     def __init__(self, RNAcompete_sequences_path, modelExpectedSeqLength):
         with open(RNAcompete_sequences_path, 'r') as f:
@@ -166,12 +158,13 @@ class RNCMPTDataset(Dataset):
 
         return input_data
 
+# Create the model.
 def createModel(inputShape, classesNum):
-    model = DeepConvModel4(inputShape,classesNum,128,512,4).to(device) 
-    #DeepSELEX2(inputShape,classesNum).to(device) # NOTE: Set the model we want to run here.
-    summary(model, inputShape)
+    model = DeepConvModel6(inputShape,classesNum).to(device) 
+    # summary(model, inputShape) # NOTE: used to debug the model design.
     return model
 
+# Create Train/Test loaders.
 def loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio):
     rbns_dataset = RBNSDataset(rbns_file_paths, SEED, seqs_per_file)
 
@@ -191,7 +184,7 @@ def loadTrainTestLoaders(rbns_file_paths, seqs_per_file, batch_size, test_ratio)
     
     return train_loader, test_loader
 
-
+# Pipeline used to Train/create a model and then to predict on it.
 class NormalPipeline:
     def __init__(self):
         print('Run with normal pipeline.')
@@ -204,7 +197,7 @@ class NormalPipeline:
         learning_rate = 1e-3
         weight_decay= 1e-5
         betas=(0.9,0.999)
-        test_ratio=0.3
+        test_ratio= 0.1 # 0.3
         patience=3
         warmup_epochs = 5
         print(f'Run with Hyperparams:\nNumber of Seqs: {seqs_per_file}, Batch_size: {batch_size}, Number of Epochs: {num_epochs},\nLearning Rate: {learning_rate}, Weight Decay: {weight_decay}, Betas: {betas}, Test Ratio: {test_ratio}, Patience: {patience}')
@@ -273,9 +266,6 @@ class NormalPipeline:
 
             # Calculate average validation loss for the epoch
             val_loss /= len(test_loader.dataset)
-            
-            tensorboard_writer.add_scalar('Loss/Train', train_loss, epoch)
-            tensorboard_writer.add_scalar('Loss/Validation', val_loss, epoch)
 
             # Early stopping check
             if val_loss < best_loss:
@@ -297,7 +287,7 @@ class NormalPipeline:
         
         self.model, self.inputShape, self.classesNum = model, inputShape, classesNum
     
-    def predict(self, RNAcompete_sequences_path, output_path = 'output_file.csv'):
+    def predict(self, RNAcompete_sequences_path):
         print(f'Start evaluate!')
         # Create the custom dataset
         eval_dataset = RNCMPTDataset(RNAcompete_sequences_path, self.inputShape[0])
@@ -306,7 +296,7 @@ class NormalPipeline:
         # Set the model to evaluation mode
         self.model.eval()
         # Evaluation loop
-        predicts = []
+        outputs = []
         with torch.no_grad():
             total = len(eval_loader)
             count = 0
@@ -321,58 +311,30 @@ class NormalPipeline:
                 predicted_columns = predicted_matrices.cpu().numpy()
 
                 # Calculate the predicted_scores for each item in the batch
-                batch_scores = []
+                batch_outputs = []
                 for i in range(len(sequences)):
-                    column_0 = predicted_columns[i, 0]
-                    column_1 = predicted_columns[i, 1]
-                    column_2 = predicted_columns[i, 2]
-                    column_3 = predicted_columns[i, 3]
-                    column_4 = predicted_columns[i, 4]
-                    column_5 = predicted_columns[i, 5]
+                    predicted_output = predicted_columns[i]
+                    batch_outputs.append(predicted_output)
 
-                    # TODO: Calculate predicted_score based on your specific formula
-                    # For example:
-                    # predicted_score = -np.min(column_0) + np.max(column_3) + np.max(column_4)
-                    # predicted_score = '\n'.join([f'{value}, ' for value in predicted_columns[i]])
-                    predicted_score = predicted_columns[i]
-                    batch_scores.append(predicted_score)
+                outputs.extend(batch_outputs)
 
-                predicts.extend(batch_scores)
+        return outputs
 
-                if count % 25000 == 0: # TODO: hardcoded (how many to pass before printing progress).
-                    print(f'Score: {predicted_score}, [{count}/{total}]')
-
-        # # Open the file in write mode
-        # with open(output_path, 'w', newline='') as file:
-        #     # Create a CSV writer object
-        #     writer = csv.writer(file)
-        #     # Convert the predicts list to a list of lists
-        #     predicts_list = [[value] for value in predicts]
-        #     # Write each list as a row in the CSV file
-        #     for row in predicts_list:
-        #         writer.writerow(row)
-
-        return predicts
-
-import torch.nn.functional as F
-
-
+# Takes predicts/truths and calculate pearson between the two sets. Used for debug.
 def pearson_compare(predicts, truths):
     # Convert the lists to tensors
-    epsilon = 1e-9  # A small value to avoid division by zero
-    predicts_tensor = torch.tensor(predicts) + epsilon
-    truths_tensor = torch.tensor(truths) + epsilon
-    print(len(predicts_tensor), len(truths_tensor))
+    predicts_tensor = torch.tensor(predicts)
+    truths_tensor = torch.tensor(truths)
+
     combined_tensor = torch.stack((predicts_tensor, truths_tensor), dim=0)
 
     # Calculate Pearson correlation
     correlation_matrix = torch.corrcoef(combined_tensor)
     pearson_correlation = correlation_matrix[0, 1]
-    
-    print('Pearson correlation:', pearson_correlation.item())
+    # return the value.
     return pearson_correlation.item()
 
-# Helper function to get all the RBP files, in a list.
+# Helper function to get all the RBP files, as a list.
 def find_rbp_files(dir_path, rbp_num):
     rbp_files = [
         f'{dir_path}/RBNS_training/{file}'
@@ -389,98 +351,7 @@ def find_rbp_files(dir_path, rbp_num):
     
     return sorted(rbp_files, key=extract_numeric_value)
 
-# helper function running over all RBPs, and train and evulate each, saving the pearson in a file.
-def RunOverAll():
-    dir_path = '.' # 'E:/RNA_DATASET'
-    with open('pearson.csv', 'a', newline='') as file:
-        writer = csv.writer(file)
-        # write row.
-        writer.writerow([f'RBP Num', 'Pearson Correlation', 'Train Time (Seconds)', 'Evalute Time (Seconds)', 'Seed'])
-    # Loop through the RBPs and process each one
-    for rbp_num in range(1, 16 + 1):
-        rbns_file_paths_rbp = find_rbp_files(dir_path, rbp_num) # Automatically find all the files and send them sorted in the right way.
-        RNAcompete_sequences_path_rbp = f"{dir_path}/RNAcompete_sequences.txt"
-        RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
-
-        start_time = time.time()
-        sp = NormalPipeline()
-        sp.trainModel(rbns_file_paths_rbp)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        train_time = elapsed_time
-        print(f"Elapsed Time for training: {elapsed_time} seconds")
-
-        start_time = time.time()
-        predicts = sp.predict(RNAcompete_sequences_path_rbp, output_path=f'outputs/RBP{rbp_num}_output.csv')
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        evalute_time = elapsed_time
-        print(f"Elapsed Time for predicts: {elapsed_time} seconds")
-        
-        # Define the input values (replace these with your actual input values)
-        inputs = [1, 2, 3, 4, 5, 6]
-
-        # Define the possible operations: +, -, or not included (x)
-        operations = ['+', '-', 'x']
-
-        # Generate all possible combinations of operations for the inputs
-        num_inputs = len(inputs)
-        # NOTE: ('x', 'x', 'x', '+', '+', 'x') works the best on most RBPs, expect of those with more than 6 classes(files), there is one of it on 16 RBPs.
-        all_combinations = [('x', 'x', 'x', '+', '+', 'x')]  # itertools.product(operations, repeat=num_inputs)
-        
-        # Iterate through all combinations
-        # TODO: used for debug. can be disabled when doing real runs.
-        max_pearson_correlation, comb = -1, None # getting max pearson.
-        for combination in all_combinations:
-            print('test: ', combination)
-            with open(RNCMPT_training_path_rbp, 'r') as f:
-                targets = [float(line.strip()) for line in f.readlines()]
-            tests = []
-            for predict in predicts:
-                # Apply each operation to the corresponding input
-                result = 0
-                for i, op in enumerate(combination):
-                    if op == '+':
-                        result += predict[i]
-                    elif op == '-':
-                        result -= inputs[i]
-                tests.append(result)
-
-            # Open the file in write mode
-            # TODO: it suppose to write to the files the results, but the calculations of predictions done outside of the prediction itself.
-            #       It needs some cleanup baiscally to manage it better.
-            with open(f'outputs/RBP{rbp_num}_output.csv', 'w', newline='') as file:
-                # Create a CSV writer object
-                writer = csv.writer(file)
-                # Convert the predicts list to a list of lists
-                predicts_list = [[value] for value in predicts]
-                # Write each list as a row in the CSV file
-                for row in predicts_list:
-                    writer.writerow(row)
-            
-            pearson_correlation = pearson_compare(tests, targets)
-            if max_pearson_correlation < pearson_correlation:
-                max_pearson_correlation = pearson_correlation
-                comb = combination
-            tensorboard_writer.add_scalar('Pearson_Correlation', pearson_correlation, rbp_num)
-            # Open the file in write mode
-            with open('pearson.csv', 'a', newline='') as file:
-                writer = csv.writer(file)
-                # write row.
-                writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED, combination])
-        
-        print('Pearson best: ', max_pearson_correlation, 'With combination: ', comb)
-        # # TODO: used for debug. can be disabled when doing real runs.
-        # with open(RNCMPT_training_path_rbp, 'r') as f:
-        #     targets = [float(line.strip()) for line in f.readlines()]
-        # pearson_correlation = pearson_compare(predicts, targets)
-        # tensorboard_writer.add_scalar('Pearson_Correlation', pearson_correlation, rbp_num)
-        # # Open the file in write mode
-        # with open('pearson.csv', 'a', newline='') as file:
-        #     writer = csv.writer(file)
-        #     # write row.
-        #     writer.writerow([f'RBP{rbp_num}', pearson_correlation, train_time, evalute_time, SEED])
-        
+# Gets the args as varibles.
 def receiveArgs():
     args_count = len(sys.argv) - 1  # Ignore the 1st, it is the script name.
     if args_count >= 6 and args_count <= 8: # includes: ofile, RNCMPT, input, RBNS1, RBNS2, .. RBNS5
@@ -493,29 +364,94 @@ def receiveArgs():
         print("No correct arguments provided.")
         sys.exit(1) # Exit with an error status
 
-if __name__ == '__main__':
-    RunOverAll()
-    tensorboard_writer.close()
-    exit()
-    ## Commend like this need to be written (basically as we instructed):
-    ## NOTE COMMEND that runs it.
-    ## 'python main.py test.txt datasets\RNAcompete_sequences.txt datasets\RBNS_training\RBP1_input.seq datasets\RBNS_training\RBP1_5nm.seq datasets\RBNS_training\RBP1_20nm.seq datasets\RBNS_training\RBP1_80nm.seq datasets\RBNS_training\RBP1_320nm.seq datasets\RBNS_training\RBP1_1300nm.seq'
-    ofile, RNCMPT, RBNS = receiveArgs()
-
+# Function that process given args, including train and predict
+def procressLogic(ofile, RNCMPT, RBNS):
+    # Initilize pipeline.
+    sp = NormalPipeline()
+    # Train the model.
     start_time = time.time()
-
-    model, inputShape, classesNum = trainModel(RBNS)
-
+    sp.trainModel(RBNS)
     end_time = time.time()
     elapsed_time = end_time - start_time
     train_time = elapsed_time
     print(f"Elapsed Time for training: {elapsed_time} seconds")
-
+    # Get Predictions pre-processed.
     start_time = time.time()
-
-    predicts = predictSlidingWindow(model, RNCMPT, inputShape, classesNum, output_path=ofile)
-
+    predicted_outputs = sp.predict(RNCMPT)
     end_time = time.time()
     elapsed_time = end_time - start_time
     evalute_time = elapsed_time
     print(f"Elapsed Time for predicts: {elapsed_time} seconds")
+    # Process outputs to binding scores.
+    
+    # Get length of expected outputs that got predicted
+    num_outputs = len(predicted_outputs[0])
+    predictions = []
+    for predict_output in predicted_outputs:
+        # TODO: find a good function for scoring the binding. We could maybe create a small neural network that will sum for us, but it will require to train over all the outputs.
+        score = - sum(predict_output[:num_outputs // 2]) + sum(predict_output[num_outputs // 2 + 1:])
+        predictions.append(score)
+
+    # Open the file in write mode
+    with open(ofile, 'w', newline='') as file:
+        # Create a CSV writer object
+        writer = csv.writer(file)
+        # Convert the predicts list to a list of lists
+        predicts_list = [[value] for value in predictions]
+        # Write each list as a row in the CSV file
+        for row in predicts_list:
+            writer.writerow(row)
+    
+    return predictions, train_time, evalute_time
+
+if __name__ == '__main__':
+    # NOTE: Commend like this need to be written (basically as we instructed):
+    #      'python main.py test.txt datasets\RNAcompete_sequences.txt datasets\RBNS_training\RBP1_input.seq datasets\RBNS_training\RBP1_5nm.seq datasets\RBNS_training\RBP1_20nm.seq datasets\RBNS_training\RBP1_80nm.seq datasets\RBNS_training\RBP1_320nm.seq datasets\RBNS_training\RBP1_1300nm.seq'
+    DebugFlag = True
+    if DebugFlag == False:
+        # Recieve paths from args.
+        ofile, RNCMPT, RBNS = receiveArgs()
+        # Run training on model, and predict the results.
+        predictions = procressLogic(ofile, RNCMPT, RBNS)
+    else:
+        # NOTE: A debug feature that allows testing all 16 RBPs in the training set.
+        # It will run on each, all the files, and report back times, and pearson corrrelation per RBP.
+        rbp_pearson_list = []
+        for rbp_num in range(1, 16 + 1):
+            # Create paths to use with.
+            dir_path = 'E:/RNA_DATASET' # '.' 
+            rbns_file_paths_rbp = find_rbp_files(dir_path, rbp_num) # Automatically find all the files and send them sorted in the right way.
+            RNAcompete_sequences_path_rbp = f"{dir_path}/RNAcompete_sequences.txt"
+            RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
+            ofile, RNCMPT, RBNS = f'outputs/RBP{rbp_num}_output.csv', RNAcompete_sequences_path_rbp, rbns_file_paths_rbp
+        
+            # Run training on model, and predict the results.
+            predictions, train_time, evalute_time = procressLogic(ofile, RNCMPT, RBNS)
+            
+            # Load real data and compare with the predicted.
+            with open(RNCMPT_training_path_rbp, 'r') as f:
+                targets = [float(line.strip()) for line in f.readlines()]
+            pearson_correlation = pearson_compare(predictions, targets)
+            print(f'RBP {rbp_num}: Pearson correlation =', pearson_correlation)
+            rbp_pearson_list.append((f'RBP {rbp_num}', pearson_correlation, train_time, evalute_time))
+
+        
+        # Get the current date and time
+        current_datetime = datetime.datetime.now()
+        # Convert the datetime object to a string
+        current_datetime_str = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
+
+        # Save debug results to a file.
+        with open(f'pearson_{current_datetime_str}.csv', 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['RBP', 'Pearson Correlation', 'Train Time (Seconds)', 'Evalute Time (Seconds)'])
+            sum_rbps = 0
+            for item in rbp_pearson_list:
+                sum_rbps += item[1]
+                writer.writerow([item[0], item[1], item[2], item[3]])
+            sum_rbps = sum_rbps / len(rbp_pearson_list)
+            print('Average Correlation: ', sum_rbps)
+            writer.writerow(['Average', sum_rbps, '',''])
+
+        print('Finished running!')
+    
