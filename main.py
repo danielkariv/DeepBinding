@@ -11,7 +11,6 @@ from torch.utils.data import Dataset, DataLoader , SubsetRandomSampler
 # from torchsummary import summary
 import pandas as pd
 import numpy as np
-from model import *
 
 # Set the seed for PyTorch
 SEED = 93015700 # random.randrange(0,123456789)
@@ -158,9 +157,47 @@ class RNCMPTDataset(Dataset):
 
         return input_data
 
+# Model is taking only max value for each kernel, and then running on them with FC layers.
+# NOTE: Correlation: 0.162162392025289 (file: pearson_2023-08-21_03-29-37.csv)
+class DeepConvModel4(nn.Module):
+    def __init__(self, inputShape = (20,4), classes = 6, hidden_size = 128, conv_chs = 512, kernel_size = 4) :
+        super(DeepConvModel4, self).__init__()
+        # First Conv1D layer
+        self.conv_layer1 = nn.Conv1d(in_channels=inputShape[1], out_channels=conv_chs, kernel_size=kernel_size, stride=1, padding=kernel_size//2, bias=True)
+        self.flatten = nn.Flatten()
+        # Define the layers
+        input_size = conv_chs
+        self.input_layer = nn.Linear(input_size, hidden_size)
+        self.hidden_layer1 = nn.Linear(hidden_size, hidden_size)
+        self.hidden_layer2 = nn.Linear(hidden_size, hidden_size)
+        self.output_layer = nn.Linear(hidden_size, classes)
+        self.relu = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        # transpose the matrix
+        x = x.permute(0, 2, 1)
+        # Conv1D layer 1
+        x = self.conv_layer1(x)
+        x, _ = torch.max(x, dim=2)  # along the time dimension
+        x = self.relu(x)
+
+        # Flatten the tensor
+        x = self.flatten(x)
+
+        # Fully connected layers
+        x = self.relu(self.input_layer(x))
+        x = self.relu(self.hidden_layer1(x))
+        x = self.relu(self.hidden_layer2(x))
+
+        # Output layer
+        x = self.output_layer(x)
+        x = self.softmax(x)
+
+        return x
 # Create the model.
 def createModel(inputShape, classesNum):
-    model = DeepConvModel6(inputShape,classesNum).to(device) 
+    model = DeepConvModel4(inputShape,classesNum).to(device) 
     # summary(model, inputShape) # NOTE: used to debug the model design.
     return model
 
@@ -320,7 +357,8 @@ class NormalPipeline:
 
         return outputs
 
-# Takes predicts/truths and calculate pearson between the two sets. Used for debug.
+# Takes predicts/truths and calculate pearson between the two sets.
+# Used for debug feature.
 def pearson_compare(predicts, truths):
     # Convert the lists to tensors
     predicts_tensor = torch.tensor(predicts)
@@ -335,10 +373,11 @@ def pearson_compare(predicts, truths):
     return pearson_correlation.item()
 
 # Helper function to get all the RBP files, as a list.
+# Used for debug feature.
 def find_rbp_files(dir_path, rbp_num):
     rbp_files = [
-        f'{dir_path}/RBNS_training/{file}'
-        for file in os.listdir(f'{dir_path}/RBNS_training')
+        f'{dir_path}/{file}'
+        for file in os.listdir(f'{dir_path}')
         if file.startswith(f'RBP{rbp_num}_') and file.endswith('.seq')
     ]
     # Define a function to extract numeric values from the file name
@@ -361,10 +400,10 @@ def receiveArgs():
         print(ofile, RNCMPT, RBNS)
         return ofile, RNCMPT, RBNS
     else:
-        print("No correct arguments provided.")
+        print("No correct amount of arguments was provided (allows output-file, RNCMPT file, and between 4-6 RBNS files).")
         sys.exit(1) # Exit with an error status
 
-# Function that process given args, including train and predict
+# Function that process given args, including train and predict process
 def procressLogic(ofile, RNCMPT, RBNS):
     # Initilize pipeline.
     sp = NormalPipeline()
@@ -388,7 +427,8 @@ def procressLogic(ofile, RNCMPT, RBNS):
     num_outputs = len(predicted_outputs[0])
     predictions = []
     for predict_output in predicted_outputs:
-        # TODO: find a good function for scoring the binding. We could maybe create a small neural network that will sum for us, but it will require to train over all the outputs.
+        # TODO: find a good function for scoring the binding.
+        # NOTE: for now, this is seems like the most balance score function. Some RBPs, loves one file over the other, but the higher ones usally the positive, and the lower ones are usally the negative.
         score = - sum(predict_output[:num_outputs // 2]) + sum(predict_output[num_outputs // 2 + 1:])
         predictions.append(score)
 
@@ -407,51 +447,52 @@ def procressLogic(ofile, RNCMPT, RBNS):
 if __name__ == '__main__':
     # NOTE: Commend like this need to be written (basically as we instructed):
     #      'python main.py test.txt datasets\RNAcompete_sequences.txt datasets\RBNS_training\RBP1_input.seq datasets\RBNS_training\RBP1_5nm.seq datasets\RBNS_training\RBP1_20nm.seq datasets\RBNS_training\RBP1_80nm.seq datasets\RBNS_training\RBP1_320nm.seq datasets\RBNS_training\RBP1_1300nm.seq'
-    DebugFlag = True
+    DebugFlag = False
+    CompareFlag = False
     if DebugFlag == False:
         # Recieve paths from args.
         ofile, RNCMPT, RBNS = receiveArgs()
         # Run training on model, and predict the results.
         predictions = procressLogic(ofile, RNCMPT, RBNS)
     else:
-        # NOTE: A debug feature that allows testing all 16 RBPs in the training set.
-        # It will run on each, all the files, and report back times, and pearson corrrelation per RBP.
+        # NOTE: A debug feature that allows testing all 16 RBPs in the training set or train over all testing set.
+        # It will run on each, all the files, and report back times, and pearson corrrelation per RBP if allowed to do so.
         rbp_pearson_list = []
         for rbp_num in range(1, 16 + 1):
             # Create paths to use with.
-            dir_path = 'E:/RNA_DATASET' # '.' 
-            rbns_file_paths_rbp = find_rbp_files(dir_path, rbp_num) # Automatically find all the files and send them sorted in the right way.
+            dir_path = 'D:/DeepBinding/datasets/' # '.' # HARDCODED path.
+            rbns_file_paths_rbp = find_rbp_files(dir_path + "RBNS_testing/", rbp_num) # Automatically find all the files and send them sorted in the right way.
             RNAcompete_sequences_path_rbp = f"{dir_path}/RNAcompete_sequences.txt"
-            RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
             ofile, RNCMPT, RBNS = f'outputs/RBP{rbp_num}_output.csv', RNAcompete_sequences_path_rbp, rbns_file_paths_rbp
         
             # Run training on model, and predict the results.
             predictions, train_time, evalute_time = procressLogic(ofile, RNCMPT, RBNS)
-            
-            # Load real data and compare with the predicted.
-            with open(RNCMPT_training_path_rbp, 'r') as f:
-                targets = [float(line.strip()) for line in f.readlines()]
-            pearson_correlation = pearson_compare(predictions, targets)
-            print(f'RBP {rbp_num}: Pearson correlation =', pearson_correlation)
-            rbp_pearson_list.append((f'RBP {rbp_num}', pearson_correlation, train_time, evalute_time))
+            if CompareFlag:
+                # Load real data and compare with the predicted.
+                RNCMPT_training_path_rbp = f"{dir_path}/RNCMPT_training/RBP{rbp_num}.txt"
+                with open(RNCMPT_training_path_rbp, 'r') as f:
+                    targets = [float(line.strip()) for line in f.readlines()]
+                pearson_correlation = pearson_compare(predictions, targets)
+                print(f'RBP {rbp_num}: Pearson correlation =', pearson_correlation)
+                rbp_pearson_list.append((f'RBP {rbp_num}', pearson_correlation, train_time, evalute_time))
 
-        
-        # Get the current date and time
-        current_datetime = datetime.datetime.now()
-        # Convert the datetime object to a string
-        current_datetime_str = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
+        if CompareFlag:
+            # Get the current date and time
+            current_datetime = datetime.datetime.now()
+            # Convert the datetime object to a string
+            current_datetime_str = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
 
-        # Save debug results to a file.
-        with open(f'pearson_{current_datetime_str}.csv', 'a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['RBP', 'Pearson Correlation', 'Train Time (Seconds)', 'Evalute Time (Seconds)'])
-            sum_rbps = 0
-            for item in rbp_pearson_list:
-                sum_rbps += item[1]
-                writer.writerow([item[0], item[1], item[2], item[3]])
-            sum_rbps = sum_rbps / len(rbp_pearson_list)
-            print('Average Correlation: ', sum_rbps)
-            writer.writerow(['Average', sum_rbps, '',''])
+            # Save debug results to a file.
+            with open(f'pearson_{current_datetime_str}.csv', 'a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['RBP', 'Pearson Correlation', 'Train Time (Seconds)', 'Evalute Time (Seconds)'])
+                sum_rbps = 0
+                for item in rbp_pearson_list:
+                    sum_rbps += item[1]
+                    writer.writerow([item[0], item[1], item[2], item[3]])
+                sum_rbps = sum_rbps / len(rbp_pearson_list)
+                print('Average Correlation: ', sum_rbps)
+                writer.writerow(['Average', sum_rbps, '',''])
 
         print('Finished running!')
     
